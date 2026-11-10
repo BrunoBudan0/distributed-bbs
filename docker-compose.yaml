@@ -1,0 +1,71 @@
+x-server: &server
+  build: ./server
+  pull_policy: build
+  init: true
+  depends_on:
+    - broker
+
+x-server-environment: &server-environment
+  BROKER_SERVER_ENDPOINT: tcp://broker:5556
+
+x-bot: &bot
+  build: ./bot
+  pull_policy: build
+  init: true
+  depends_on:
+    - broker
+
+x-bot-environment: &bot-environment
+  BROKER_CLIENT_ENDPOINT: tcp://broker:5555
+
+services:
+  broker:
+    build: ./broker
+    pull_policy: build
+    init: true
+
+  server-1:
+    <<: *server
+    environment:
+      <<: *server-environment
+      SERVER_NAME: server-1
+    volumes:
+      - server-1-data:/data
+
+  server-2:
+    <<: *server
+    environment:
+      <<: *server-environment
+      SERVER_NAME: server-2
+    volumes:
+      - server-2-data:/data
+
+  bot-1:
+    <<: *bot
+    environment:
+      <<: *bot-environment
+      BOT_USERNAME: bot-1
+
+  bot-2:
+    <<: *bot
+    environment:
+      <<: *bot-environment
+      BOT_USERNAME: bot-2
+
+  tests:
+    build: ./tests
+    pull_policy: build
+    profiles:
+      - test
+    environment:
+      BROKER_CLIENT_ENDPOINT: tcp://broker:5555
+      SERVER_DATABASE_PATH: /server-1-data/bbs.sqlite3
+    volumes:
+      - server-1-data:/server-1-data:ro
+    depends_on:
+      - broker
+      - server-1
+
+volumes:
+  server-1-data:
+  server-2-data:
