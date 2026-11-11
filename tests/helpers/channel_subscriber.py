@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import msgpack
 import zmq
 
-from helpers.bbs_client import current_timestamp_ms
+from helpers.request_exchange import current_timestamp_ms
 
 PUBLICATION_TIMEOUT_MS = 10000
 

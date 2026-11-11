@@ -3,7 +3,7 @@ from errors.base_error import BbsError
 
 class MalformedMessage(BbsError):
     code = "MALFORMED_MESSAGE"
-    description = "the message must be a MessagePack map with operation, sender, timestamp and payload"
+    description = "the message must be a MessagePack map with operation, sender, timestamp, logical_clock and payload"
 
 
 class UnknownOperation(BbsError):

@@ -23,6 +23,7 @@ from helpers import (
 MESSAGE_AT_MAXIMUM_LENGTH = "m" * MAX_MESSAGE_LENGTH
 MESSAGE_ABOVE_MAXIMUM_LENGTH = "m" * (MAX_MESSAGE_LENGTH + 1)
 REQUEST_TIMESTAMP_MS = 1762711391123
+CLOCK_SYNCHRONIZATION_TOLERANCE_MS = 100
 
 
 def test_publication_in_existing_channel_is_answered_with_success(bbs_client):
@@ -57,7 +58,11 @@ def test_publication_carries_its_own_send_timestamp_instead_of_the_request_times
 
     publication = subscriber.next_publication()
     assert type(publication.fields["timestamp"]) is int
-    assert earliest_expected_timestamp <= publication.fields["timestamp"] <= publication.received_at_ms
+    assert (
+        earliest_expected_timestamp - CLOCK_SYNCHRONIZATION_TOLERANCE_MS
+        <= publication.fields["timestamp"]
+        <= publication.received_at_ms + CLOCK_SYNCHRONIZATION_TOLERANCE_MS
+    )
 
 
 @pytest.mark.parametrize(

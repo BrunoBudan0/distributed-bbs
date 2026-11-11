@@ -8,6 +8,12 @@ class Operation(StrEnum):
     PUBLISH = "publish"
 
 
+class ReferenceOperation(StrEnum):
+    RANK = "rank"
+    LIST_SERVERS = "list_servers"
+    HEARTBEAT = "heartbeat"
+
+
 class ResponseStatus(StrEnum):
     SUCCESS = "success"
     ERROR = "error"

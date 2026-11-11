@@ -5,10 +5,12 @@ x-server: &server
   depends_on:
     - broker
     - proxy
+    - reference
 
 x-server-environment: &server-environment
   BROKER_SERVER_ENDPOINT: tcp://broker:5556
   PROXY_PUBLISHER_ENDPOINT: tcp://proxy:5557
+  REFERENCE_ENDPOINT: tcp://reference:5559
 
 x-bot: &bot
   build: ./bot
@@ -33,6 +35,11 @@ services:
     pull_policy: build
     init: true
 
+  reference:
+    build: ./reference
+    pull_policy: build
+    init: true
+
   server-1:
     <<: *server
     environment:
@@ -46,6 +53,7 @@ services:
     environment:
       <<: *server-environment
       SERVER_NAME: server-2
+      SIMULATED_CLOCK_SKEW_MS: 7000
     volumes:
       - server-2-data:/data
 
@@ -61,6 +69,15 @@ services:
       <<: *bot-environment
       BOT_USERNAME: bot-2
 
+  reference-under-test:
+    build: ./reference
+    pull_policy: build
+    init: true
+    profiles:
+      - test
+    environment:
+      HEARTBEAT_TIMEOUT_MS: 1500
+
   tests:
     build: ./tests
     pull_policy: build
@@ -69,12 +86,17 @@ services:
     environment:
       BROKER_CLIENT_ENDPOINT: tcp://broker:5555
       PROXY_SUBSCRIBER_ENDPOINT: tcp://proxy:5558
+      REFERENCE_ENDPOINT: tcp://reference:5559
+      SHORT_TIMEOUT_REFERENCE_ENDPOINT: tcp://reference-under-test:5559
+      SHORT_HEARTBEAT_TIMEOUT_MS: 1500
       SERVER_DATABASE_PATH: /server-1-data/bbs.sqlite3
     volumes:
       - server-1-data:/server-1-data:ro
     depends_on:
       - broker
       - proxy
+      - reference
+      - reference-under-test
       - server-1
 
 volumes:

@@ -19,6 +19,7 @@ function isPublicationMessage(decodedMessage: unknown): decodedMessage is Public
     typeof decodedMessage.operation === "string" &&
     typeof decodedMessage.sender === "string" &&
     Number.isInteger(decodedMessage.timestamp) &&
+    Number.isSafeInteger(decodedMessage.logical_clock) &&
     typeof decodedMessage.payload.channel === "string" &&
     typeof decodedMessage.payload.author === "string" &&
     typeof decodedMessage.payload.message === "string"

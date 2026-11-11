@@ -8,6 +8,7 @@ from errors.custom_errors import (
     MalformedMessage,
     UnknownOperation,
 )
+from errors.reference_errors import ReferenceTimeout, UnexpectedReferenceResponse
 
 __all__ = [
     "BbsError",
@@ -17,5 +18,7 @@ __all__ = [
     "InvalidMessage",
     "InvalidUsername",
     "MalformedMessage",
+    "ReferenceTimeout",
+    "UnexpectedReferenceResponse",
     "UnknownOperation",
 ]
