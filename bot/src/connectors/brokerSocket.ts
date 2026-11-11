@@ -1,4 +1,4 @@
-import { Request } from "zeromq";
+import { Context, Request } from "zeromq";
 
 import { RESPONSE_TIMEOUT_MS } from "../constants.js";
 import { BrokerTimeout } from "../errors/customErrors.js";
@@ -6,6 +6,7 @@ import { BrokerTimeout } from "../errors/customErrors.js";
 const ZEROMQ_TIMEOUT_ERROR_CODE = "EAGAIN";
 
 export class BrokerSocket {
+  private readonly requestPathContext = new Context();
   private requestSocket: Request;
 
   constructor(private readonly brokerEndpoint: string) {
@@ -37,6 +38,7 @@ export class BrokerSocket {
 
   private newConnectedSocket(): Request {
     const requestSocket = new Request({
+      context: this.requestPathContext,
       receiveTimeout: RESPONSE_TIMEOUT_MS,
       sendTimeout: RESPONSE_TIMEOUT_MS,
       linger: 0,

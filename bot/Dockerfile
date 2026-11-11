@@ -7,7 +7,8 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+COPY tests ./tests
+RUN npm test
 
 FROM node:24-slim
 
@@ -16,8 +17,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/dist/src ./dist/src
 
 USER node
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

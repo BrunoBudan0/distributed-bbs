@@ -1,7 +1,10 @@
 from constants import (
     CHANNEL_FIELD,
     CHANNEL_NAME_PATTERN,
+    MAX_MESSAGE_LENGTH,
     MAX_TIMESTAMP_MS,
+    MESSAGE_FIELD,
+    MIN_MESSAGE_LENGTH,
     MIN_TIMESTAMP_MS,
     OPERATION_FIELD,
     PAYLOAD_FIELD,
@@ -11,7 +14,7 @@ from constants import (
     USERNAME_PATTERN,
 )
 from dtos import RequestMessage
-from errors import InvalidChannelName, InvalidUsername, MalformedMessage, UnknownOperation
+from errors import InvalidChannelName, InvalidMessage, InvalidUsername, MalformedMessage, UnknownOperation
 from models import Operation
 
 REQUIRED_FIELD_TYPES = {
@@ -21,6 +24,7 @@ REQUIRED_FIELD_TYPES = {
     PAYLOAD_FIELD: dict,
 }
 KNOWN_OPERATION_NAMES = tuple(operation.value for operation in Operation)
+OPERATIONS_NAMING_A_CHANNEL = (Operation.CREATE_CHANNEL, Operation.PUBLISH)
 
 
 def is_valid_timestamp(timestamp: object) -> bool:
@@ -44,8 +48,11 @@ def request_from(decoded_message: object) -> RequestMessage:
     refuse_invalid_username(decoded_message[SENDER_FIELD])
 
     operation = Operation(decoded_message[OPERATION_FIELD])
-    if operation is Operation.CREATE_CHANNEL:
+    if operation in OPERATIONS_NAMING_A_CHANNEL:
         refuse_invalid_channel_name(decoded_message[PAYLOAD_FIELD].get(CHANNEL_FIELD))
+
+    if operation is Operation.PUBLISH:
+        refuse_invalid_message(decoded_message[PAYLOAD_FIELD].get(MESSAGE_FIELD))
 
     return RequestMessage(
         operation=operation,
@@ -80,3 +87,8 @@ def refuse_invalid_username(username: str) -> None:
 def refuse_invalid_channel_name(channel_name: object) -> None:
     if type(channel_name) is not str or CHANNEL_NAME_PATTERN.fullmatch(channel_name) is None:
         raise InvalidChannelName()
+
+
+def refuse_invalid_message(message: object) -> None:
+    if type(message) is not str or not MIN_MESSAGE_LENGTH <= len(message) <= MAX_MESSAGE_LENGTH:
+        raise InvalidMessage()

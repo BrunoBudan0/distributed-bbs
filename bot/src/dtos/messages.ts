@@ -2,6 +2,7 @@ export enum Operation {
   Login = "login",
   CreateChannel = "create_channel",
   ListChannels = "list_channels",
+  Publish = "publish",
 }
 
 export enum ResponseStatus {
@@ -22,4 +23,15 @@ export interface ResponseMessage {
   timestamp: number;
   status: ResponseStatus;
   payload: Record<string, unknown>;
+}
+
+export interface PublicationMessage {
+  operation: string;
+  sender: string;
+  timestamp: number;
+  payload: {
+    channel: string;
+    author: string;
+    message: string;
+  };
 }

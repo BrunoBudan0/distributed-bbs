@@ -22,6 +22,10 @@ def print_sent_message(message_fields: dict) -> None:
     print_line(SENT_LABEL, described_message(message_fields))
 
 
+def print_sent_publication(topic: str, publication_fields: dict) -> None:
+    print_line(SENT_LABEL, f"topic={topic!r}{FIELD_SEPARATOR}{described_message(publication_fields)}")
+
+
 def print_line(direction_label: str, description: str) -> None:
     print(f"{direction_label}{FIELD_SEPARATOR}{description}", flush=True)
 

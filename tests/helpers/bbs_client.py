@@ -4,7 +4,7 @@ import msgpack
 import zmq
 
 from helpers.names import new_username
-from helpers.protocol import CREATE_CHANNEL, LIST_CHANNELS, LOGIN
+from helpers.protocol import CREATE_CHANNEL, LIST_CHANNELS, LOGIN, PUBLISH
 
 RESPONSE_TIMEOUT_MS = 15000
 MILLISECONDS_PER_SECOND = 1000
@@ -50,3 +50,16 @@ class BbsClient:
 
     def listed_channel_names(self) -> list[str]:
         return self.list_channels()["payload"]["channels"]
+
+    def publish(
+        self,
+        channel_name: object,
+        message: object,
+        author_username: str | None = None,
+        timestamp: int | None = None,
+    ) -> dict:
+        sender = new_username() if author_username is None else author_username
+        request_timestamp = current_timestamp_ms() if timestamp is None else timestamp
+        return self.exchange_message(
+            self.valid_request(PUBLISH, sender, {"channel": channel_name, "message": message}, request_timestamp)
+        )

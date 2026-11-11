@@ -3,7 +3,7 @@
     "target": "es2023",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "strict": true,
     "noImplicitReturns": true,
@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

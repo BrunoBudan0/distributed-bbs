@@ -1,8 +1,9 @@
 import os
+from collections.abc import Iterator
 
 import pytest
 
-from helpers import BbsClient, LoginHistory
+from helpers import BbsClient, ChannelSubscriber, ServerDatabase
 
 
 @pytest.fixture
@@ -11,5 +12,12 @@ def bbs_client() -> BbsClient:
 
 
 @pytest.fixture
-def login_history() -> LoginHistory:
-    return LoginHistory(os.environ["SERVER_DATABASE_PATH"])
+def server_database() -> ServerDatabase:
+    return ServerDatabase(os.environ["SERVER_DATABASE_PATH"])
+
+
+@pytest.fixture
+def subscriber() -> Iterator[ChannelSubscriber]:
+    channel_subscriber = ChannelSubscriber(os.environ["PROXY_SUBSCRIBER_ENDPOINT"])
+    yield channel_subscriber
+    channel_subscriber.close()

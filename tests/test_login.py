@@ -29,26 +29,26 @@ def test_username_outside_the_allowed_format_is_refused(bbs_client, username):
     assert_refused(bbs_client.log_in(username), INVALID_USERNAME)
 
 
-def test_accepted_login_is_stored_on_disk_with_the_message_timestamp(bbs_client, login_history):
+def test_accepted_login_is_stored_on_disk_with_the_message_timestamp(bbs_client, server_database):
     username = new_username()
 
     setup_succeeded(bbs_client.log_in(username, LOGIN_TIMESTAMP_MS), "login")
 
-    assert login_history.logged_in_timestamps_of(username) == [LOGIN_TIMESTAMP_MS]
+    assert server_database.logged_in_timestamps_of(username) == [LOGIN_TIMESTAMP_MS]
 
 
-def test_every_login_of_the_same_user_is_stored_on_disk(bbs_client, login_history):
+def test_every_login_of_the_same_user_is_stored_on_disk(bbs_client, server_database):
     username = new_username()
 
     setup_succeeded(bbs_client.log_in(username, LOGIN_TIMESTAMP_MS), "first login")
     setup_succeeded(bbs_client.log_in(username, SECOND_LOGIN_TIMESTAMP_MS), "second login")
 
-    assert login_history.logged_in_timestamps_of(username) == [LOGIN_TIMESTAMP_MS, SECOND_LOGIN_TIMESTAMP_MS]
+    assert server_database.logged_in_timestamps_of(username) == [LOGIN_TIMESTAMP_MS, SECOND_LOGIN_TIMESTAMP_MS]
 
 
-def test_refused_login_stores_nothing_on_disk(bbs_client, login_history):
+def test_refused_login_stores_nothing_on_disk(bbs_client, server_database):
     refused_username = f"{new_username()} with space"
 
     assert_refused(bbs_client.log_in(refused_username), INVALID_USERNAME)
 
-    assert login_history.logged_in_timestamps_of(refused_username) == []
+    assert server_database.logged_in_timestamps_of(refused_username) == []

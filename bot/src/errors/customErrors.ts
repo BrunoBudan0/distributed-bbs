@@ -12,6 +12,18 @@ export class UnexpectedResponse extends Error {
   }
 }
 
+export class UnexpectedPublication extends Error {
+  constructor(decodedMessage: unknown) {
+    super(`a publication arrived outside the protocol: ${inspect(decodedMessage, { depth: null })}`);
+  }
+}
+
+export class SubscriptionClosed extends Error {
+  constructor() {
+    super("the subscription socket stopped delivering publications");
+  }
+}
+
 export class MissingEnvironmentVariable extends Error {
   constructor(variableName: string) {
     super(`the environment variable ${variableName} is required`);
