@@ -1,4 +1,4 @@
-import { CHANNEL_FIELD } from "../constants.js";
+import { CHANNEL_FIELD, MESSAGE_FIELD } from "../constants.js";
 import { Operation, RequestMessage, ResponseMessage } from "../dtos/messages.js";
 import { responseFrom } from "../schemas/responseSchema.js";
 import { currentTimestampMs } from "../utils/clock.js";
@@ -22,6 +22,10 @@ export class BbsConnector {
 
   listChannels(): Promise<ResponseMessage> {
     return this.exchange(Operation.ListChannels, {});
+  }
+
+  publish(channelName: string, message: string): Promise<ResponseMessage> {
+    return this.exchange(Operation.Publish, { [CHANNEL_FIELD]: channelName, [MESSAGE_FIELD]: message });
   }
 
   private async exchange(operation: Operation, payload: Record<string, string>): Promise<ResponseMessage> {

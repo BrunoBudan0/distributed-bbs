@@ -16,6 +16,10 @@ class ChannelRepository:
         )
         return inserted_rows.rowcount == 1
 
+    def exists(self, name: str) -> bool:
+        found_row = self.database_connection.execute("SELECT 1 FROM channel WHERE name = ?", (name,)).fetchone()
+        return found_row is not None
+
     def all_names(self) -> list[str]:
         rows = self.database_connection.execute("SELECT name FROM channel ORDER BY name").fetchall()
         return [channel_name for (channel_name,) in rows]

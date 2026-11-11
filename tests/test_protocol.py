@@ -8,6 +8,7 @@ from helpers import (
     LOGIN,
     MALFORMED_MESSAGE,
     MAX_TIMESTAMP_MS,
+    TESTED_SERVER_NAME,
     UNIDENTIFIED_OPERATION,
     UNKNOWN_OPERATION,
     assert_refused,
@@ -17,7 +18,6 @@ from helpers import (
 
 VALID_TIMESTAMP_MS = 1762711391123
 MILLISECONDS_PER_SECOND = 1000
-SERVER_NAME = "server-1"
 
 
 def complete_login_message() -> dict:
@@ -111,4 +111,4 @@ def test_response_carries_its_send_timestamp_in_milliseconds(bbs_client):
 
 
 def test_response_identifies_the_server_that_answered(bbs_client):
-    assert bbs_client.log_in(new_username())["sender"] == SERVER_NAME
+    assert bbs_client.log_in(new_username())["sender"] == TESTED_SERVER_NAME

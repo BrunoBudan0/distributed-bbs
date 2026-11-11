@@ -4,9 +4,11 @@ x-server: &server
   init: true
   depends_on:
     - broker
+    - proxy
 
 x-server-environment: &server-environment
   BROKER_SERVER_ENDPOINT: tcp://broker:5556
+  PROXY_PUBLISHER_ENDPOINT: tcp://proxy:5557
 
 x-bot: &bot
   build: ./bot
@@ -14,13 +16,20 @@ x-bot: &bot
   init: true
   depends_on:
     - broker
+    - proxy
 
 x-bot-environment: &bot-environment
   BROKER_CLIENT_ENDPOINT: tcp://broker:5555
+  PROXY_SUBSCRIBER_ENDPOINT: tcp://proxy:5558
 
 services:
   broker:
     build: ./broker
+    pull_policy: build
+    init: true
+
+  proxy:
+    build: ./proxy
     pull_policy: build
     init: true
 
@@ -59,11 +68,13 @@ services:
       - test
     environment:
       BROKER_CLIENT_ENDPOINT: tcp://broker:5555
+      PROXY_SUBSCRIBER_ENDPOINT: tcp://proxy:5558
       SERVER_DATABASE_PATH: /server-1-data/bbs.sqlite3
     volumes:
       - server-1-data:/server-1-data:ro
     depends_on:
       - broker
+      - proxy
       - server-1
 
 volumes:

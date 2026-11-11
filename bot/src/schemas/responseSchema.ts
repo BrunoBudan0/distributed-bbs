@@ -1,6 +1,7 @@
 import { CHANNELS_FIELD } from "../constants.js";
 import { ResponseMessage, ResponseStatus } from "../dtos/messages.js";
 import { UnexpectedResponse } from "../errors/customErrors.js";
+import { isListOfTexts, isMap } from "./valueChecks.js";
 
 const KNOWN_RESPONSE_STATUSES: unknown[] = Object.values(ResponseStatus);
 
@@ -33,12 +34,4 @@ function isResponseMessage(decodedMessage: unknown): decodedMessage is ResponseM
     KNOWN_RESPONSE_STATUSES.includes(decodedMessage.status) &&
     isMap(decodedMessage.payload)
   );
-}
-
-function isMap(decodedValue: unknown): decodedValue is Record<string, unknown> {
-  return typeof decodedValue === "object" && decodedValue !== null && !Array.isArray(decodedValue);
-}
-
-function isListOfTexts(decodedValue: unknown): decodedValue is string[] {
-  return Array.isArray(decodedValue) && decodedValue.every((item) => typeof item === "string");
 }

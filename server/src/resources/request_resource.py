@@ -1,9 +1,16 @@
 from connectors import BrokerConnector, decode_message, encode_message
-from constants import CHANNEL_FIELD, CHANNELS_FIELD, ERROR_CODE_FIELD, ERROR_DESCRIPTION_FIELD, UNIDENTIFIED_OPERATION
-from controllers import ChannelController, LoginController
+from constants import (
+    CHANNEL_FIELD,
+    CHANNELS_FIELD,
+    ERROR_CODE_FIELD,
+    ERROR_DESCRIPTION_FIELD,
+    MESSAGE_FIELD,
+    UNIDENTIFIED_OPERATION,
+)
+from controllers import ChannelController, LoginController, PublicationController
 from dtos import RequestMessage, ResponseMessage
 from errors import BbsError, MalformedMessage
-from models import Operation, ResponseStatus
+from models import Operation, Publication, ResponseStatus
 from schemas import operation_label_of, request_from
 from utils import (
     current_timestamp_ms,
@@ -20,15 +27,18 @@ class RequestResource:
         broker_connector: BrokerConnector,
         login_controller: LoginController,
         channel_controller: ChannelController,
+        publication_controller: PublicationController,
     ) -> None:
         self.server_name = server_name
         self.broker_connector = broker_connector
         self.login_controller = login_controller
         self.channel_controller = channel_controller
+        self.publication_controller = publication_controller
         self.operation_handlers = {
             Operation.LOGIN: self.handle_login,
             Operation.CREATE_CHANNEL: self.handle_create_channel,
             Operation.LIST_CHANNELS: self.handle_list_channels,
+            Operation.PUBLISH: self.handle_publish,
         }
 
     def serve_forever(self) -> None:
@@ -86,3 +96,16 @@ class RequestResource:
 
     def handle_list_channels(self, request: RequestMessage) -> dict:
         return {CHANNELS_FIELD: self.channel_controller.channel_names()}
+
+    def handle_publish(self, request: RequestMessage) -> dict:
+        self.publication_controller.publish_or_refuse(
+            Publication(
+                channel_name=request.payload[CHANNEL_FIELD],
+                author_username=request.sender,
+                message=request.payload[MESSAGE_FIELD],
+                requested_at_ms=request.timestamp,
+                published_at_ms=current_timestamp_ms(),
+                published_by_server=self.server_name,
+            )
+        )
+        return {}

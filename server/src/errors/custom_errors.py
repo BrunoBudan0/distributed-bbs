@@ -8,7 +8,7 @@ class MalformedMessage(BbsError):
 
 class UnknownOperation(BbsError):
     code = "UNKNOWN_OPERATION"
-    description = "the operation must be login, create_channel or list_channels"
+    description = "the operation must be login, create_channel, list_channels or publish"
 
 
 class InvalidUsername(BbsError):
@@ -24,3 +24,13 @@ class InvalidChannelName(BbsError):
 class ChannelAlreadyExists(BbsError):
     code = "CHANNEL_ALREADY_EXISTS"
     description = "a channel with this name already exists on this server"
+
+
+class ChannelNotFound(BbsError):
+    code = "CHANNEL_NOT_FOUND"
+    description = "there is no channel with this name on this server"
+
+
+class InvalidMessage(BbsError):
+    code = "INVALID_MESSAGE"
+    description = "the message must be a text with 1 to 500 characters"
