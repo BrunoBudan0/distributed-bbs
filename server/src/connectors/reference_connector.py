@@ -11,7 +11,7 @@ from constants import (
 )
 from errors import ReferenceTimeout
 from models import LogicalClock, PhysicalClock, ReferenceOperation
-from schemas import reference_response_from
+from schemas import process_response_from
 from utils import print_received_message, print_sent_message
 
 
@@ -54,7 +54,7 @@ class ReferenceConnector:
             self.replace_socket()
             raise ReferenceTimeout(REFERENCE_TIMEOUT_MS)
 
-        response_fields = reference_response_from(decode_message(self.request_socket.recv()))
+        response_fields = process_response_from(decode_message(self.request_socket.recv()))
         print_received_message(response_fields)
         self.logical_clock.observe(response_fields[LOGICAL_CLOCK_FIELD])
         return response_fields

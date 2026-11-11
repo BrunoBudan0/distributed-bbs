@@ -1,11 +1,22 @@
 from helpers.assertions import assert_refused, assert_succeeded, setup_succeeded
 from helpers.bbs_client import BbsClient
 from helpers.channel_subscriber import ChannelSubscriber
+from helpers.coordination_scenarios import (
+    announcement_after_triggering_elections,
+    announcement_of_coordinator_after_client_messages,
+    server_became_coordinator,
+)
+from helpers.coordinator_impersonator import CoordinatorImpersonator
 from helpers.names import new_channel_name, new_server_name, new_username
+from helpers.peer_client import PeerClient
 from helpers.protocol import (
     CHANNEL_ALREADY_EXISTS,
     CHANNEL_NOT_FOUND,
+    CLOCK,
+    COORDINATOR_ANNOUNCEMENT,
+    COORDINATOR_TOPIC,
     CREATE_CHANNEL,
+    ELECTION,
     HEARTBEAT,
     INVALID_CHANNEL_NAME,
     INVALID_MESSAGE,
@@ -18,6 +29,8 @@ from helpers.protocol import (
     MAX_LOGICAL_CLOCK,
     MAX_MESSAGE_LENGTH,
     MAX_TIMESTAMP_MS,
+    NOT_COORDINATOR,
+    PEER_TEST_SERVER_NAME,
     PUBLICATION,
     PUBLISH,
     RANK,
@@ -37,8 +50,13 @@ __all__ = [
     "BbsClient",
     "CHANNEL_ALREADY_EXISTS",
     "CHANNEL_NOT_FOUND",
+    "CLOCK",
+    "COORDINATOR_ANNOUNCEMENT",
+    "COORDINATOR_TOPIC",
     "CREATE_CHANNEL",
     "ChannelSubscriber",
+    "CoordinatorImpersonator",
+    "ELECTION",
     "HEARTBEAT",
     "INVALID_CHANNEL_NAME",
     "INVALID_MESSAGE",
@@ -51,8 +69,11 @@ __all__ = [
     "MAX_LOGICAL_CLOCK",
     "MAX_MESSAGE_LENGTH",
     "MAX_TIMESTAMP_MS",
+    "NOT_COORDINATOR",
+    "PEER_TEST_SERVER_NAME",
     "PUBLICATION",
     "PUBLISH",
+    "PeerClient",
     "RANK",
     "REFERENCE_NAME",
     "ReferenceClient",
@@ -62,6 +83,8 @@ __all__ = [
     "UNIDENTIFIED_OPERATION",
     "UNKNOWN_OPERATION",
     "UNKNOWN_SERVER",
+    "announcement_after_triggering_elections",
+    "announcement_of_coordinator_after_client_messages",
     "assert_refused",
     "assert_succeeded",
     "condition_holds_within",
@@ -72,5 +95,6 @@ __all__ = [
     "new_server_name",
     "new_username",
     "publications_before_barrier",
+    "server_became_coordinator",
     "setup_succeeded",
 ]

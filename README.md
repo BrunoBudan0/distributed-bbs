@@ -1,12 +1,18 @@
 # Distributed BBS
 
-Sistema de troca de mensagens instantâneas inspirado no BBS e no IRC. Bots fazem login, criam canais públicos, se inscrevem neles e publicam mensagens. Todas as interações ficam gravadas em disco, todos os processos marcam as mensagens com um relógio lógico, os servidores sincronizam o relógio físico com um serviço de referência e podem entrar e sair sem parar o serviço.
+Sistema de troca de mensagens instantâneas inspirado no BBS e no IRC. Bots fazem login, criam canais públicos, se inscrevem neles e publicam mensagens. Todas as interações ficam gravadas em disco, todos os processos marcam as mensagens com um relógio lógico, os servidores elegem entre si um coordenador que sincroniza os relógios físicos pelo algoritmo de Berkeley, e podem entrar e sair sem parar o serviço.
 
 Projeto individual da disciplina de Sistemas Distribuídos (Ciência da Computação, FEI), de Bruno Budano Mello.
 
 ## Arquitetura
 
-São três caminhos de mensagem. Pedidos dos bots seguem por `REQ`/`REP` através do broker. Publicações nos canais seguem por `PUB`/`SUB` através do proxy. Os servidores conversam com o serviço de referência por `REQ`/`REP` para receber o rank, avisar que estão vivos e acertar o relógio.
+São cinco caminhos de mensagem:
+
+1. Pedidos dos bots seguem por `REQ`/`REP` através do broker.
+2. Publicações nos canais seguem por `PUB`/`SUB` através do proxy.
+3. Os servidores conversam com o serviço de referência por `REQ`/`REP` para receber o rank, avisar que estão vivos e saber quem está disponível.
+4. Os servidores conversam entre si, direto, por `REQ`/`REP` na porta 5560, para pedir eleição e pedir a hora ao coordenador.
+5. O coordenador eleito se anuncia publicando no tópico `servers`, pelo mesmo proxy das publicações.
 
 ```
 Pedidos (REQ/REP)
@@ -21,19 +27,28 @@ server-1 (PUB) --+                         +-- (SUB) bot-1
                  +-- XSUB [ proxy ] XPUB --+
 server-2 (PUB) --+   5557          5558    +-- (SUB) bot-2
 
-Rank, heartbeat e hora (REQ/REP)
+Rank, heartbeat e lista de servidores (REQ/REP)
 
 server-1 (REQ) --+
                  +-- REP [ reference ] 5559
 server-2 (REQ) --+
+
+Eleição e hora entre servidores (REQ/REP direto)
+
+server-1 (REQ) -----> (REP 5560) server-2
+server-1 (REP 5560) <----- (REQ) server-2
+
+Anúncio do coordenador (PUB/SUB, tópico servers)
+
+coordenador (PUB) --> XSUB [ proxy ] XPUB --> (SUB servers) server-1, server-2
 ```
 
 | Serviço | Responsabilidade | Linguagem | Dados |
 |---|---|---|---|
 | `broker` | Repassa os pedidos dos bots para os servidores, em rodízio | Python | Nenhum |
 | `proxy` | Repassa as publicações dos servidores para os bots inscritos no canal | Python | Nenhum |
-| `reference` | Dá o rank de cada servidor, mantém a lista dos disponíveis por heartbeat e informa a hora correta | Python | Em memória |
-| `server-1`, `server-2` | Validam os pedidos, aplicam as regras, gravam em disco, publicam nos canais e sincronizam o relógio | Python | Um volume por servidor |
+| `reference` | Dá o rank de cada servidor e mantém a lista dos disponíveis por heartbeat | Python | Em memória |
+| `server-1`, `server-2` | Validam os pedidos, aplicam as regras, gravam em disco, publicam nos canais, elegem o coordenador e sincronizam o relógio com ele | Python | Um volume por servidor |
 | `bot-1`, `bot-2` | Usuários automáticos: fazem login, criam canais, se inscrevem e publicam | TypeScript | Nenhum |
 
 Toda a comunicação usa a rede criada pelo Docker Compose. Nenhuma porta é publicada na máquina.
@@ -57,21 +72,45 @@ bot-2-1      | RECEIVED   | topic='music' | operation='publication' | sender='se
 bot-2-1      | RECEIVED   | operation='publish' | sender='server-2' | timestamp=2026-11-11T14:42:07.931Z | logical_clock=33 | status='success' | payload={}
 ```
 
-O relógio lógico salta de 28 para 32 porque o servidor já estava em 31: logo antes, a referência respondeu ao heartbeat e à lista de servidores com o relógio dela, e o servidor ficou com o maior valor.
+O relógio lógico salta de 28 para 32 porque o servidor já estava em 31: logo antes, ele trocou mensagens com outro processo e ficou com o maior valor.
 
 Na publicação recebida, `timestamp` é o envio pelo servidor e `received_at` é a chegada ao bot.
 
-O `server-2` começa com o relógio físico adiantado em 7 s de propósito (`SIMULATED_CLOCK_SKEW_MS` no compose), porque no Docker todos os containers usam o relógio da mesma máquina e não haveria nada para sincronizar. A correção aparece no primeiro heartbeat:
+Ao subir, cada servidor pede o rank e faz uma eleição. O de rank maior vence e se anuncia no tópico `servers`:
 
 ```
-bot-2-1      | SENT       | operation='publish' | sender='bot-2' | timestamp=2026-11-11T14:42:06.912Z | logical_clock=25 | payload={ channel: 'music', message: 'Essa música é ótima.' }
-bot-2-1      | RECEIVED   | operation='publish' | sender='server-2' | timestamp=2026-11-11T14:42:13.921Z | logical_clock=27 | status='success' | payload={}
-server-2-1   | CLOCK    | physical clock synchronized with the reference | offset_before_ms=7000 | offset_after_ms=0 | round_trip_ms=2
-bot-2-1      | SENT       | operation='publish' | sender='bot-2' | timestamp=2026-11-11T14:42:07.925Z | logical_clock=28 | payload={ channel: 'music', message: 'Boa noite a todos.' }
-bot-2-1      | RECEIVED   | operation='publish' | sender='server-2' | timestamp=2026-11-11T14:42:07.931Z | logical_clock=33 | status='success' | payload={}
+server-1-1   | ELECTION | started by this server | asking higher ranked servers=[]
+server-1-1   | ELECTION | no higher ranked server answered | this server is now the coordinator
+server-2-1   | ELECTION | started by this server | asking higher ranked servers=[]
+server-2-1   | ELECTION | no higher ranked server answered | this server is now the coordinator
+server-2-1   | SENT     | topic='servers' | operation='coordinator' | sender='server-2' | timestamp=2026-11-11T19:41:03.023Z | logical_clock=8 | payload={'coordinator': 'server-2'}
+server-1-1   | RECEIVED | topic='servers' | operation='coordinator' | sender='server-2' | timestamp=2026-11-11T19:41:03.023Z | logical_clock=8 | payload={'coordinator': 'server-2'}
+server-1-1   | ELECTION | announcement received | coordinator='server-2'
 ```
 
-Antes da sincronização, a resposta do `server-2` aparece 7 s depois do pedido; depois, 6 ms.
+O `server-1` subiu antes de o `server-2` estar cadastrado e se declarou coordenador por um instante; ao receber o anúncio de rank maior, passou a seguir o `server-2`.
+
+O `server-2` começa com o relógio físico adiantado em 7 s de propósito (`SIMULATED_CLOCK_SKEW_MS` no compose), porque no Docker todos os containers usam o relógio da mesma máquina e não haveria nada para sincronizar. Na primeira rodada de Berkeley, o coordenador faz a média entre os dois relógios e os dois se encontram no meio:
+
+```
+server-1-1   | SENT     | operation='clock' | sender='server-1' | timestamp=2026-11-11T19:41:02.068Z | logical_clock=38 | payload={}
+server-2-1   | RECEIVED | operation='clock' | sender='server-1' | timestamp=2026-11-11T19:41:02.068Z | logical_clock=38 | payload={}
+server-2-1   | BERKELEY | clock of 'server-1' was -7003 ms from this coordinator | average adjustment_ms=-3502 | coordinator offset_after_ms=3498
+server-2-1   | SENT     | operation='clock' | sender='server-2' | timestamp=2026-11-11T19:41:05.569Z | logical_clock=39 | status='success' | payload={'time': 1794426065569}
+server-1-1   | RECEIVED | operation='clock' | sender='server-2' | timestamp=2026-11-11T19:41:05.569Z | logical_clock=39 | status='success' | payload={'time': 1794426065569}
+server-1-1   | CLOCK    | physical clock synchronized with the coordinator 'server-2' | offset_before_ms=0 | offset_after_ms=3499 | round_trip_ms=4
+```
+
+Os dois servidores passam a concordar em +3,5 s em relação à máquina. Berkeley busca acordo entre os relógios do grupo, não a hora certa.
+
+Se o coordenador cair, o outro servidor percebe no próximo pedido de hora e assume:
+
+```
+server-1-1   | TIMEOUT  | the server 'server-2' did not answer
+server-1-1   | ELECTION | started by this server | asking higher ranked servers=['server-2']
+server-1-1   | TIMEOUT  | the server 'server-2' did not answer
+server-1-1   | ELECTION | no higher ranked server answered | this server is now the coordinator
+```
 
 Para desligar mantendo os dados, `docker compose down`. Para desligar **e apagar os dados dos servidores**, `docker compose down -v`.
 
@@ -103,7 +142,16 @@ Operações atendidas pela referência, pedidas pelos servidores (o `sender` é 
 |---|---|---|
 | `rank` | `{}` | `{rank: 1}` |
 | `list_servers` | `{}` | `{servers: [{name: "server-1", rank: 1}, ...]}`, em ordem de rank |
-| `heartbeat` | `{}` | `{time: 1794407196413}`, a hora correta em milissegundos |
+| `heartbeat` | `{}` | `{}` |
+
+Operações atendidas por um servidor, pedidas por outro servidor (porta 5560; o `sender` é o nome de quem pede e o `timestamp` é o relógio dele):
+
+| Operação | `payload` do pedido | `payload` da resposta com sucesso |
+|---|---|---|
+| `election` | `{}` | `{}`, o OK da eleição |
+| `clock` | `{}` | `{time: 1794426065569}`, a hora combinada pelo coordenador em milissegundos |
+
+Anúncio do coordenador, publicado no tópico `servers`: `{operation: "coordinator", sender, timestamp, logical_clock, payload: {coordinator: "server-2"}}`.
 
 Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 
@@ -112,12 +160,13 @@ Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 | `MALFORMED_MESSAGE` | Servidor e referência | Os bytes não são MessagePack, ou falta campo, ou um campo tem tipo ou faixa inválidos |
 | `UNKNOWN_OPERATION` | Servidor e referência | A operação não existe |
 | `INVALID_USERNAME` | Servidor | O nome do usuário está fora do formato permitido |
-| `INVALID_CHANNEL_NAME` | Servidor | O nome do canal está fora do formato permitido |
+| `INVALID_CHANNEL_NAME` | Servidor | O nome do canal está fora do formato permitido ou é `servers`, reservado para o anúncio do coordenador |
 | `CHANNEL_ALREADY_EXISTS` | Servidor | Já existe canal com esse nome no servidor que atendeu |
 | `CHANNEL_NOT_FOUND` | Servidor | Pedido de publicação num canal que não existe no servidor que atendeu |
 | `INVALID_MESSAGE` | Servidor | A mensagem não é texto ou está fora do tamanho permitido |
-| `INVALID_SERVER_NAME` | Referência | O nome do servidor está fora do formato permitido |
+| `INVALID_SERVER_NAME` | Referência e servidor | O nome do servidor que pede está fora do formato permitido |
 | `UNKNOWN_SERVER` | Referência | Heartbeat de um servidor que nunca pediu rank |
+| `NOT_COORDINATOR` | Servidor | Pedido de hora a um servidor que não é o coordenador |
 
 ## Regras
 
@@ -131,7 +180,7 @@ Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 | Publicação em canal inexistente | Recusada com `CHANNEL_NOT_FOUND`, sem gravar nem publicar | Só se publica em canal criado no servidor |
 | Ordem da publicação | Grava em disco, publica no tópico, responde ao bot | Se o servidor cair no meio, a publicação fica guardada em vez de se perder |
 | Erro ou timeout no login | O bot repete o login a cada 2 s até ser aceito | Exigência do enunciado |
-| Timeout de resposta | 5 s no bot e 2 s no servidor falando com a referência; quem pediu descarta o socket `REQ` e abre outro | Um `REQ` sem resposta fica preso e não aceita novo envio |
+| Timeout de resposta | 5 s no bot, 2 s no servidor falando com a referência e 1 s entre servidores; quem pediu descarta o socket `REQ` e abre outro | Um `REQ` sem resposta fica preso e não aceita novo envio |
 
 ### Relógios
 
@@ -141,11 +190,25 @@ Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 | Mensagem recusada | O `logical_clock` recebido é considerado mesmo quando o pedido é recusado, desde que o campo seja válido | Toda mensagem recebida conta, não só as aceitas |
 | Limite do relógio lógico | Aceito de 0 a 2^52; ao chegar no limite, o relógio para ali em vez de passar | Sem esse teto, um único cliente mandando o valor máximo empurraria todos os processos para além dele, e daí em diante todos os pedidos seriam recusados. 2^52 cabe com folga no maior inteiro exato do JavaScript |
 | Rank | A referência dá ranks 1, 2, 3... na ordem do primeiro pedido; o mesmo nome recebe sempre o mesmo rank | O enunciado pede a lista sem nomes repetidos |
-| Heartbeat | O servidor envia um heartbeat depois de cada 10 mensagens de clientes e, em seguida, pede a lista de servidores | Frequência pedida pelo enunciado; o heartbeat sai depois da resposta ao bot, para não atrasá-lo |
+| Heartbeat | O servidor envia um heartbeat depois de cada 10 mensagens de clientes e, em seguida, pede a lista de servidores. A resposta do heartbeat não traz mais a hora | Frequência pedida pelo enunciado; o heartbeat sai depois da resposta ao bot, para não atrasá-lo |
 | Remoção | A referência tira da lista o servidor sem rank nem heartbeat há mais de 30 s; ele volta com o mesmo rank no próximo heartbeat | Disponibilidade separada do cadastro, para o rank não mudar a cada queda |
 | Referência reiniciada | Ela esquece os servidores; o heartbeat recebe `UNKNOWN_SERVER` e o servidor pede rank de novo | O cadastro fica em memória |
-| Relógio físico | No heartbeat, o servidor mede a ida e volta e ajusta o relógio para a hora da referência mais metade desse tempo | Algoritmo de Cristian: a resposta leva cerca de metade da ida e volta para chegar |
+| Sincronização do relógio físico | Depois de cada 15 mensagens de clientes, o servidor que não é coordenador pede a hora ao coordenador (`clock`), mandando o próprio relógio no `timestamp` | Frequência pedida pelo enunciado |
+| Berkeley no coordenador | O coordenador guarda a diferença de cada servidor que pediu nos últimos 60 s, faz a média com a própria diferença (zero), ajusta o próprio relógio pela média e responde com a hora resultante | É a média de Berkeley: o grupo converge para um valor comum. Leituras com mais de 60 s ficam de fora para um servidor que sumiu não puxar a média |
+| Ajuste de quem pediu | O servidor adota a hora recebida mais metade do tempo de ida e volta | Compensa a demora da resposta em chegar |
 | Onde o ajuste vale | O servidor guarda um deslocamento (`offset_ms`) e o soma a todo `timestamp` que envia e grava | O container não tem permissão para mudar o relógio do sistema |
+
+### Eleição
+
+| Regra | Lógica | Por quê |
+|---|---|---|
+| Quem é o coordenador | O servidor disponível de maior rank. Cada servidor guarda o nome do coordenador em `coordinator_name` | Algoritmo do valentão (Bully): vence o maior identificador |
+| Quando há eleição | Ao subir; quando o coordenador não responde ao pedido de hora ou diz que não é coordenador; quando ainda não se sabe quem é o coordenador; ao receber um pedido de eleição; ao receber o anúncio de um servidor de rank menor | Toda forma de descobrir que o coordenador sumiu ou que existe alguém maior |
+| Para quem se pede | Só para os servidores de rank maior, da lista da referência | Pedidos só sobem de rank, então ninguém fica esperando quem está esperando por ele |
+| Resposta | Quem recebe `election` responde OK na hora e faz a própria eleição em seguida | O OK diz a quem pediu que existe alguém maior vivo |
+| Resultado | Se nenhum maior responder em 1 s, o servidor vira coordenador e publica `[servers] {coordinator: nome}`. Se algum responder, ele espera o anúncio | Igual ao Bully; o anúncio vale para todos os servidores de uma vez |
+| Anúncio perdido | Quem não sabe o coordenador faz nova eleição na próxima sincronização | O `SUB` pode perder um anúncio enviado antes de a inscrição chegar ao proxy |
+| Servidor sem rank | Não faz eleição até ter rank | Sem rank não há como comparar |
 
 ### Comportamento padronizado dos bots
 
@@ -169,12 +232,16 @@ O catálogo de canais tem exatamente 5 nomes, para os bots nunca criarem nomes s
 | Persistência | SQLite, um arquivo por servidor em volume próprio | Arquivo JSON Lines: legível, mas exigiria implementar unicidade e escrita atômica | O arquivo é binário; para inspecionar é preciso um cliente SQLite |
 | Pedidos | `REQ`/`ROUTER`/`DEALER`/`REP` | `REQ`/`REP` direto: o bot precisaria conhecer cada servidor | O broker é ponto único de falha |
 | Publicações | `PUB`/`XSUB`/`XPUB`/`SUB`, com o proxy separado do broker | `PUB` no servidor e `SUB` ligado direto nele: o bot teria de conhecer cada servidor | Mais um ponto único de falha |
-| Isolamento dos caminhos | Um contexto ZeroMQ por caminho: pedidos, publicações e referência, no servidor e no bot | Um contexto só por processo | Com um contexto só, a queda do proxy travava também os pedidos: cada tentativa de reconexão consulta o DNS por 3,5 s no mesmo thread de I/O. Separados, a queda do proxy não atrasa nenhuma resposta |
+| Isolamento dos caminhos | Um contexto ZeroMQ por caminho: pedidos dos bots, publicações, referência, pedidos entre servidores e anúncios, no servidor e no bot | Um contexto só por processo | Com um contexto só, a queda do proxy travava também os pedidos: cada tentativa de reconexão consulta o DNS por 3,5 s no mesmo thread de I/O. Separados, a queda do proxy não atrasa nenhuma resposta |
 | Tópico | Nome do canal no primeiro frame; o bot confere se o tópico é exatamente um canal assinado | Confiar só no filtro do ZeroMQ, que compara por prefixo e entregaria `news-br` a quem assina `news` | Uma verificação a mais no bot |
 | Publicações em disco | Tabela `publication` com canal, autor, mensagem, horário do pedido, horário da publicação e servidor que publicou | Gravar só o texto | Mais colunas, mas qualquer informação pode ser recuperada depois |
 | Timestamp do login e do pedido | O da mensagem do bot | Relógio do servidor | Confia no relógio do cliente |
-| Sincronização do relógio físico | Cristian, com a referência como fonte da hora | Berkeley, com média entre servidores: o enunciado define a referência como quem informa a hora correta | Se a referência estiver errada, todos os servidores ficam errados juntos |
-| Hora no heartbeat | Campo `time` explícito na resposta | Usar só o `timestamp` da resposta, que tem o mesmo valor | Um campo a mais, mas o log mostra que a hora foi pedida |
+| Sincronização do relógio físico | Berkeley com o coordenador eleito, no formato pedido pelo enunciado: cada servidor manda o próprio relógio e recebe a hora combinada | Berkeley clássico, com o coordenador consultando todos os servidores de uma vez: o enunciado define o servidor como quem pergunta | A média só usa as leituras recebidas nos últimos 60 s |
+| Hora no pedido de relógio | O próprio `timestamp` do pedido, que já é o relógio de quem pede | Um campo a mais no `payload` | Nenhum; o `timestamp` existe em toda mensagem |
+| Hora na resposta | Campo `time` explícito | Usar só o `timestamp` da resposta | Um campo a mais, mas o log mostra que a hora foi pedida |
+| Eleição | Bully, por rank | Anel: exige conhecer a ordem dos vizinhos e circular a mensagem por todos | Pedidos em sequência aos ranks maiores, 1 s de espera por servidor que não responde |
+| Endereço de outro servidor | O nome do servidor, que é o nome do serviço no Compose, na porta 5560 | Guardar endereços na referência | O nome do servidor precisa ser igual ao nome do container |
+| Tópico `servers` | Reservado: nenhum canal pode ter esse nome, e o servidor só aceita no tópico mensagens com `operation: "coordinator"` | Aceitar qualquer publicação no tópico | Um bot não consegue se passar por coordenador criando um canal `servers` |
 | Cadastro da referência | Em memória | SQLite também na referência | Se a referência reiniciar, os ranks são distribuídos de novo na ordem dos heartbeats |
 
 ## Limitações conhecidas
@@ -186,17 +253,21 @@ O catálogo de canais tem exatamente 5 nomes, para os bots nunca criarem nomes s
 | Histórico dividido | Logins e publicações ficam só no servidor que atendeu | Mesmo motivo |
 | Publicação não espera inscrito | Quem se inscreve depois não recebe as publicações anteriores, que continuam gravadas em disco | `PUB`/`SUB` entrega só para quem já está inscrito no momento do envio |
 | Servidor ocioso sai da lista | Um servidor que fica 30 s sem receber 10 mensagens de clientes não manda heartbeat e é removido, mesmo vivo | O enunciado amarra o heartbeat ao número de mensagens, não ao tempo |
-| Referência fora do ar | Os bots continuam sendo atendidos, mas cada heartbeat espera 2 s antes de desistir, e o relógio físico deixa de ser corrigido até ela voltar | A referência é um processo único |
+| Referência fora do ar | Os bots continuam sendo atendidos, mas cada heartbeat espera 2 s antes de desistir, e a lista de servidores usada na eleição fica parada na última versão | A referência é um processo único |
+| Berkeley não busca a hora certa | Com o atraso simulado de 7 s, o grupo concorda em cerca de +3,5 s em relação à máquina; se o servidor adiantado reinicia, o acordo se desloca de novo (numa execução, para +5,2 s) | Berkeley faz a média do grupo e não tem fonte de hora externa |
+| Espera durante a eleição | Enquanto pede eleição ou hora a outro servidor, o servidor não atende bots; cada servidor que não responde custa 1 s | O laço de atendimento é de uma linha só |
+| Dois coordenadores por um instante | Ao subir, um servidor que ainda não vê o maior na lista se declara coordenador até o anúncio do maior chegar | A lista da referência só mostra quem já se cadastrou |
+| Anúncio sem autenticação | Qualquer processo na rede do Compose pode publicar no tópico `servers` | Protótipo; os testes usam isso para simular um coordenador que caiu |
 
 ## Testes
 
 | Suíte | Como roda | O que testa |
 |---|---|---|
-| Black-box do sistema (`tests/`, pytest) | Container na rede do Compose, falando com o broker, o proxy e a referência como um cliente qualquer | Login, canais, publicação, entrega aos inscritos, relógio lógico nas respostas e publicações, protocolo da referência e o que fica gravado em disco |
-| Unitários do servidor (`server/tests/`, pytest) | Na construção da imagem do servidor; a imagem não é gerada se um teste falhar | Relógio lógico, cálculo de Cristian e quando o servidor manda heartbeat e acerta o relógio |
+| Black-box do sistema (`tests/`, pytest) | Container na rede do Compose, falando com o broker, o proxy, a referência e a porta 5560 do `server-1` como um cliente qualquer | Login, canais, publicação, entrega aos inscritos, relógio lógico, protocolo da referência, eleição, anúncio, Berkeley e o que fica gravado em disco |
+| Unitários do servidor (`server/tests/`, pytest) | Na construção da imagem do servidor; a imagem não é gerada se um teste falhar | Relógio lógico, média de Berkeley, regras da eleição, sincronização a cada 15 mensagens e heartbeat a cada 10 |
 | Unitários dos bots (`bot/tests/`, `node:test`) | Na construção da imagem do bot; a imagem não é gerada se um teste falhar | Relógio lógico e as decisões de criar, assinar e publicar |
 
-A suíte black-box só lê o arquivo do `server-1`, em modo somente leitura, para conferir logins e publicações gravados, porque o protocolo não tem operação que devolva esse histórico. Os testes da referência usam um segundo serviço de referência, `reference-under-test`, com prazo de heartbeat de 1,5 s, para provar a remoção sem esperar 30 s.
+A suíte black-box só lê o arquivo do `server-1`, em modo somente leitura, para conferir logins e publicações gravados, porque o protocolo não tem operação que devolva esse histórico. Os testes da referência usam um segundo serviço de referência, `reference-under-test`, com prazo de heartbeat de 1,5 s, para provar a remoção sem esperar 30 s. Para provar a troca de coordenador, um teste publica no tópico `servers` o anúncio de um coordenador que não existe e confere que o `server-1` percebe a falta dele e assume. Os testes que mudam um relógio usado pelos demais levam a marcação `changes_shared_clock` e rodam por último.
 
 ```bash
 docker compose -p distributed-bbs-test --profile test run --rm --build tests
@@ -225,9 +296,12 @@ npm test
 | `tests/test_publications.py` | Publicação, entrega no tópico certo, timestamp, gravação em disco e recusas que não gravam nem publicam |
 | `tests/test_protocol.py` | Formato binário, campos obrigatórios, limites do timestamp e do relógio lógico, operação desconhecida |
 | `tests/test_logical_clock.py` | Relógio lógico do servidor nas respostas, nas recusas e nas publicações |
-| `tests/test_reference.py` | Rank, lista, heartbeat com a hora, remoção por silêncio, volta com o mesmo rank e cadastro do `server-1` |
-| `server/tests/test_clocks.py` | Relógio lógico, saturação no limite e cálculo de Cristian |
-| `server/tests/test_reference_controller.py` | Heartbeat a cada 10 mensagens, pedido de rank quando falta e sincronização do relógio |
+| `tests/test_reference.py` | Rank, lista, heartbeat sem hora, remoção por silêncio, volta com o mesmo rank e cadastro do `server-1` |
+| `tests/test_coordination.py` | OK da eleição, anúncio no tópico `servers`, hora do coordenador, média de Berkeley e troca de coordenador quando ele some |
+| `server/tests/test_clocks.py` | Relógio lógico, saturação no limite e compensação da ida e volta |
+| `server/tests/test_berkeley.py` | Média de Berkeley, leituras vencidas e reposicionamento das leituras |
+| `server/tests/test_coordination_controller.py` | Para quem se pede eleição, quando assumir, Bully, sincronização a cada 15 mensagens e recusa de quem não é coordenador |
+| `server/tests/test_reference_controller.py` | Heartbeat a cada 10 mensagens, pedido de rank quando falta e lista de servidores |
 | `bot/tests/botDecisions.test.ts` | Números padronizados do enunciado e as decisões de criar, assinar e publicar |
 | `bot/tests/logicalClock.test.ts` | Relógio lógico do bot |
 
@@ -238,7 +312,8 @@ npm test
 | Bot mostra `TIMEOUT` em sequência | Nenhum servidor conectado ao broker | Conferir com `docker compose ps` e subir um servidor; o bot volta sozinho |
 | Bot publica mas nenhum bot recebe | O proxy caiu ou ninguém assina aquele canal | Conferir o `proxy` com `docker compose ps`; as linhas `SUBSCRIBED` mostram o que cada bot assina |
 | `CHANNEL_NOT_FOUND` em parte das publicações | O canal não existe no servidor que atendeu | Esperado enquanto os servidores não sincronizam; ver "Limitações conhecidas" |
-| `server-2` responde com horário 7 s à frente no começo | Atraso simulado de propósito | Some no primeiro heartbeat, depois de 10 mensagens de clientes |
+| Servidores respondem com horário alguns segundos à frente da máquina | Atraso simulado de 7 s no `server-2` e média de Berkeley | Esperado; os servidores concordam entre si. Para tirar o atraso, apague `SIMULATED_CLOCK_SKEW_MS` do compose |
+| Servidor mostra `TIMEOUT` ao falar com outro servidor | O outro servidor caiu | Esperado; se era o coordenador, há eleição e um novo coordenador se anuncia |
 | Servidor mostra `TIMEOUT` ao falar com a referência | A referência caiu | Conferir com `docker compose ps`; ao voltar, os servidores se cadastram de novo sozinhos |
 | Bots listam os canais antigos depois de um novo começo | Os volumes foram preservados | `docker compose down -v` |
 | Mudança em `server/database/database.sql` não aparece | A tabela já existe no volume | `docker compose down -v` |
@@ -249,11 +324,11 @@ npm test
 |---|---|
 | `broker/` | Proxy `ROUTER`/`DEALER` dos pedidos |
 | `proxy/` | Proxy `XSUB`/`XPUB` das publicações |
-| `reference/` | Serviço de referência: rank, lista de servidores, heartbeat e hora |
-| `server/src/resources/` | Laço de atendimento e rotas das operações |
-| `server/src/schemas/` | Validação do formato dos pedidos e das respostas da referência |
-| `server/src/controllers/` | Regras, decisão de gravar e publicar, conversa com a referência |
-| `server/src/models/` | Publicação, relógio lógico e relógio físico |
+| `reference/` | Serviço de referência: rank, lista de servidores e heartbeat |
+| `server/src/resources/` | Laço que ouve os três sockets de entrada e as rotas das operações |
+| `server/src/schemas/` | Validação do formato dos pedidos, dos anúncios e das respostas de outros processos |
+| `server/src/controllers/` | Regras, decisão de gravar e publicar, conversa com a referência, eleição e Berkeley |
+| `server/src/models/` | Publicação, relógio lógico, relógio físico e média de Berkeley |
 | `server/src/repositories/` | Único lugar com SQL |
 | `server/src/connectors/` | Único lugar que conhece ZeroMQ e MessagePack |
 | `server/database/` | Schema do banco |
@@ -283,6 +358,10 @@ npm test
 | Referência | `reference` | Broker; a referência só conversa com servidores |
 | Rank | `rank` | Ordem de chegada dos pedidos; o rank é fixo por nome de servidor |
 | Heartbeat | `heartbeat` | Login; o heartbeat é do servidor para a referência |
+| Coordenador | `coordinator_name` | Referência; o coordenador é um dos servidores, eleito entre eles |
+| Eleição | `election`, `hold_election` | Rank; o rank vem da referência, a eleição usa o rank para decidir |
+| Anúncio | `CoordinatorAnnouncement`, tópico `servers` | Publicação em canal; o anúncio vai só para servidores |
+| Rodada de Berkeley | `BerkeleyCoordinator`, operação `clock` | Cristian; aqui o coordenador faz a média, não é dono da hora |
 | Recusa | `BbsError` | Timeout, que é falta de resposta |
 
 ## Entregas
@@ -294,3 +373,4 @@ Cada parte é desenvolvida em uma branch própria.
 | 1 | `parte-1` | Login, criação e listagem de canais, persistência |
 | 2 | `parte-2` | Publicação em canais com `PUB`/`SUB`, proxy, inscrições dos bots e persistência das publicações |
 | 3 | `parte-3` | Relógio lógico em todas as mensagens, serviço de referência com rank, lista e heartbeat, sincronização do relógio físico |
+| 4 | `parte-4` | Eleição do coordenador (Bully), anúncio no tópico `servers` e sincronização dos relógios por Berkeley com o coordenador |

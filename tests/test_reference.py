@@ -17,14 +17,12 @@ from helpers import (
     assert_refused,
     assert_succeeded,
     condition_holds_within,
-    current_timestamp_ms,
     new_server_name,
     setup_succeeded,
 )
 
 REQUEST_LOGICAL_CLOCK = 1_000_000
 REQUEST_CLOCK_AHEAD_OF_THE_REFERENCE = 1_000
-CLOCK_SYNCHRONIZATION_TOLERANCE_MS = 100
 REMOVAL_DEADLINE_FACTOR = 5
 REGISTRATION_DEADLINE_MS = 10000
 HEARTBEATS_PER_TIMEOUT = 3
@@ -81,17 +79,14 @@ def test_server_list_is_ordered_by_rank(short_timeout_reference_client):
     assert listed_ranks == sorted(listed_ranks)
 
 
-def test_heartbeat_of_a_registered_server_is_answered_with_the_reference_time(short_timeout_reference_client):
+def test_heartbeat_of_a_registered_server_is_answered_with_ok_and_no_time(short_timeout_reference_client):
     server_name = new_server_name()
     registered_rank(short_timeout_reference_client, server_name)
-    earliest_expected_time = current_timestamp_ms() - CLOCK_SYNCHRONIZATION_TOLERANCE_MS
 
     response = short_timeout_reference_client.heartbeat(server_name)
 
-    latest_expected_time = current_timestamp_ms() + CLOCK_SYNCHRONIZATION_TOLERANCE_MS
     assert_succeeded(response, HEARTBEAT)
-    assert type(response["payload"]["time"]) is int
-    assert earliest_expected_time <= response["payload"]["time"] <= latest_expected_time
+    assert response["payload"] == {}
 
 
 def test_heartbeat_of_a_server_that_never_asked_for_a_rank_is_refused_and_not_listed(short_timeout_reference_client):
@@ -171,7 +166,7 @@ def test_message_without_logical_clock_is_refused_by_the_reference(short_timeout
     assert_refused(short_timeout_reference_client.exchange_bytes(msgpack.packb(message)), MALFORMED_MESSAGE)
 
 
-@pytest.mark.saturates_logical_clock
+@pytest.mark.changes_shared_clock
 def test_logical_clock_at_the_maximum_is_accepted_and_does_not_stop_later_requests(short_timeout_reference_client):
     response_to_maximum = short_timeout_reference_client.rank(new_server_name(), logical_clock=MAX_LOGICAL_CLOCK)
 

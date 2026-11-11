@@ -4,11 +4,14 @@ from errors.custom_errors import (
     ChannelNotFound,
     InvalidChannelName,
     InvalidMessage,
+    InvalidServerName,
     InvalidUsername,
     MalformedMessage,
+    NotCoordinator,
     UnknownOperation,
+    UnknownPeerOperation,
 )
-from errors.reference_errors import ReferenceTimeout, UnexpectedReferenceResponse
+from errors.reference_errors import PeerUnavailable, ReferenceTimeout, UnexpectedProcessResponse
 
 __all__ = [
     "BbsError",
@@ -16,9 +19,13 @@ __all__ = [
     "ChannelNotFound",
     "InvalidChannelName",
     "InvalidMessage",
+    "InvalidServerName",
     "InvalidUsername",
     "MalformedMessage",
+    "NotCoordinator",
+    "PeerUnavailable",
     "ReferenceTimeout",
-    "UnexpectedReferenceResponse",
+    "UnexpectedProcessResponse",
     "UnknownOperation",
+    "UnknownPeerOperation",
 ]
