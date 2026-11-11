@@ -3,13 +3,21 @@ from collections.abc import Iterator
 
 import pytest
 
-from helpers import BbsClient, ChannelSubscriber, ReferenceClient, ServerDatabase
+from helpers import (
+    COORDINATOR_TOPIC,
+    BbsClient,
+    ChannelSubscriber,
+    CoordinatorImpersonator,
+    PeerClient,
+    ReferenceClient,
+    ServerDatabase,
+)
 
-SATURATES_LOGICAL_CLOCK_MARKER = "saturates_logical_clock"
+CHANGES_SHARED_CLOCK_MARKER = "changes_shared_clock"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    items.sort(key=lambda item: item.get_closest_marker(SATURATES_LOGICAL_CLOCK_MARKER) is not None)
+    items.sort(key=lambda item: item.get_closest_marker(CHANGES_SHARED_CLOCK_MARKER) is not None)
 
 
 @pytest.fixture
@@ -27,6 +35,26 @@ def subscriber() -> Iterator[ChannelSubscriber]:
     channel_subscriber = ChannelSubscriber(os.environ["PROXY_SUBSCRIBER_ENDPOINT"])
     yield channel_subscriber
     channel_subscriber.close()
+
+
+@pytest.fixture
+def announcement_listener() -> Iterator[ChannelSubscriber]:
+    coordinator_topic_subscriber = ChannelSubscriber(os.environ["PROXY_SUBSCRIBER_ENDPOINT"])
+    coordinator_topic_subscriber.subscribe(COORDINATOR_TOPIC)
+    yield coordinator_topic_subscriber
+    coordinator_topic_subscriber.close()
+
+
+@pytest.fixture
+def coordinator_impersonator() -> Iterator[CoordinatorImpersonator]:
+    impersonator = CoordinatorImpersonator(os.environ["PROXY_PUBLISHER_ENDPOINT"])
+    yield impersonator
+    impersonator.close()
+
+
+@pytest.fixture
+def peer_client() -> PeerClient:
+    return PeerClient(os.environ["SERVER_PEER_ENDPOINT"])
 
 
 @pytest.fixture

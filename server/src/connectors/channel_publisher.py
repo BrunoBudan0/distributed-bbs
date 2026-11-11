@@ -1,7 +1,8 @@
 import zmq
 
 from connectors.message_codec import encode_message
-from dtos import PublicationMessage
+from constants import COORDINATOR_TOPIC
+from dtos import CoordinatorAnnouncement, PublicationMessage
 from models import LogicalClock, Publication
 from utils import print_sent_publication
 
@@ -15,8 +16,14 @@ class ChannelPublisher:
 
     def publish(self, publication: Publication) -> None:
         publication_message = PublicationMessage.from_publication(publication, self.logical_clock.tick_for_send())
-        publication_fields = publication_message.as_fields()
-        print_sent_publication(publication.channel_name, publication_fields)
-        self.publisher_socket.send_multipart(
-            [publication.channel_name.encode(), encode_message(publication_fields)]
+        self.send_on_topic(publication.channel_name, publication_message.as_fields())
+
+    def announce_coordinator(self, coordinator_name: str, sent_at_ms: int) -> None:
+        announcement = CoordinatorAnnouncement.of_coordinator(
+            coordinator_name, sent_at_ms, self.logical_clock.tick_for_send()
         )
+        self.send_on_topic(COORDINATOR_TOPIC, announcement.as_fields())
+
+    def send_on_topic(self, topic: str, message_fields: dict) -> None:
+        print_sent_publication(topic, message_fields)
+        self.publisher_socket.send_multipart([topic.encode(), encode_message(message_fields)])

@@ -17,3 +17,6 @@ class PhysicalClock:
 
     def synchronize(self, reference_time_ms: int, request_sent_at_ms: int, response_received_at_ms: int) -> None:
         self.offset_ms = cristian_offset_ms(reference_time_ms, request_sent_at_ms, response_received_at_ms)
+
+    def shift(self, adjustment_ms: int) -> None:
+        self.offset_ms += adjustment_ms

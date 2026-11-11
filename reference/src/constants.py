@@ -24,7 +24,6 @@ STATUS_FIELD = "status"
 RANK_FIELD = "rank"
 SERVERS_FIELD = "servers"
 NAME_FIELD = "name"
-TIME_FIELD = "time"
 ERROR_CODE_FIELD = "error_code"
 ERROR_DESCRIPTION_FIELD = "error_description"
 

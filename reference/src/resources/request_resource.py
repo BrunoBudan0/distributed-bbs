@@ -7,7 +7,6 @@ from constants import (
     REFERENCE_NAME,
     SERVERS_FIELD,
     SWEEP_INTERVAL_MS,
-    TIME_FIELD,
     UNIDENTIFIED_OPERATION,
 )
 from controllers import ServerRegistryController
@@ -99,4 +98,4 @@ class RequestResource:
 
     def handle_heartbeat(self, request: RequestMessage) -> dict:
         self.server_registry_controller.record_heartbeat(request.sender)
-        return {TIME_FIELD: current_timestamp_ms()}
+        return {}

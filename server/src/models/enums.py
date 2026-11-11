@@ -8,6 +8,11 @@ class Operation(StrEnum):
     PUBLISH = "publish"
 
 
+class PeerOperation(StrEnum):
+    ELECTION = "election"
+    CLOCK = "clock"
+
+
 class ReferenceOperation(StrEnum):
     RANK = "rank"
     LIST_SERVERS = "list_servers"
