@@ -7,6 +7,7 @@ import pytest
 from helpers import (
     LOGIN,
     MALFORMED_MESSAGE,
+    MAX_LOGICAL_CLOCK,
     MAX_TIMESTAMP_MS,
     TESTED_SERVER_NAME,
     UNIDENTIFIED_OPERATION,
@@ -17,11 +18,19 @@ from helpers import (
 )
 
 VALID_TIMESTAMP_MS = 1762711391123
+VALID_LOGICAL_CLOCK = 1
 MILLISECONDS_PER_SECOND = 1000
+CLOCK_SYNCHRONIZATION_TOLERANCE_MS = 100
 
 
 def complete_login_message() -> dict:
-    return {"operation": LOGIN, "sender": new_username(), "timestamp": VALID_TIMESTAMP_MS, "payload": {}}
+    return {
+        "operation": LOGIN,
+        "sender": new_username(),
+        "timestamp": VALID_TIMESTAMP_MS,
+        "logical_clock": VALID_LOGICAL_CLOCK,
+        "payload": {},
+    }
 
 
 def test_json_bytes_are_refused_as_malformed(bbs_client):
@@ -41,7 +50,7 @@ def test_message_pack_that_is_not_a_map_is_refused_as_malformed(bbs_client):
     assert_refused(bbs_client.exchange_message(["login"]), MALFORMED_MESSAGE)
 
 
-@pytest.mark.parametrize("missing_field", ["operation", "sender", "timestamp", "payload"])
+@pytest.mark.parametrize("missing_field", ["operation", "sender", "timestamp", "logical_clock", "payload"])
 def test_message_without_a_required_field_is_refused_as_malformed(bbs_client, missing_field):
     incomplete_message = complete_login_message()
     del incomplete_message[missing_field]
@@ -57,6 +66,11 @@ def test_message_without_a_required_field_is_refused_as_malformed(bbs_client, mi
         ("timestamp", 1762711391.5),
         ("timestamp", -1),
         ("timestamp", MAX_TIMESTAMP_MS + 1),
+        ("logical_clock", "1"),
+        ("logical_clock", True),
+        ("logical_clock", 1.5),
+        ("logical_clock", -1),
+        ("logical_clock", MAX_LOGICAL_CLOCK + 1),
         ("sender", 123),
         ("operation", 123),
         ("operation", ["login"]),
@@ -68,6 +82,11 @@ def test_message_without_a_required_field_is_refused_as_malformed(bbs_client, mi
         "timestamp_float",
         "timestamp_negative",
         "timestamp_above_maximum",
+        "logical_clock_text",
+        "logical_clock_boolean",
+        "logical_clock_float",
+        "logical_clock_negative",
+        "logical_clock_above_maximum",
         "sender_number",
         "operation_number",
         "operation_list",
@@ -83,6 +102,10 @@ def test_field_with_invalid_value_is_refused_as_malformed(bbs_client, field_name
 @pytest.mark.parametrize("timestamp", [0, MAX_TIMESTAMP_MS], ids=["minimum", "maximum"])
 def test_timestamp_at_the_limits_is_accepted(bbs_client, timestamp):
     assert_succeeded(bbs_client.log_in(new_username(), timestamp), LOGIN)
+
+
+def test_logical_clock_at_the_minimum_is_accepted(bbs_client):
+    assert_succeeded(bbs_client.log_in(new_username(), logical_clock=0), LOGIN)
 
 
 def test_unknown_operation_is_refused(bbs_client):
@@ -101,11 +124,11 @@ def test_server_keeps_answering_after_a_malformed_message(bbs_client):
 
 
 def test_response_carries_its_send_timestamp_in_milliseconds(bbs_client):
-    earliest_expected_timestamp = int(time.time() * MILLISECONDS_PER_SECOND)
+    earliest_expected_timestamp = int(time.time() * MILLISECONDS_PER_SECOND) - CLOCK_SYNCHRONIZATION_TOLERANCE_MS
 
     response = bbs_client.log_in(new_username())
 
-    latest_expected_timestamp = int(time.time() * MILLISECONDS_PER_SECOND)
+    latest_expected_timestamp = int(time.time() * MILLISECONDS_PER_SECOND) + CLOCK_SYNCHRONIZATION_TOLERANCE_MS
     assert type(response["timestamp"]) is int
     assert earliest_expected_timestamp <= response["timestamp"] <= latest_expected_timestamp
 

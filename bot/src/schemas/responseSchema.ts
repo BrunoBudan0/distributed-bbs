@@ -31,6 +31,7 @@ function isResponseMessage(decodedMessage: unknown): decodedMessage is ResponseM
     typeof decodedMessage.operation === "string" &&
     typeof decodedMessage.sender === "string" &&
     Number.isInteger(decodedMessage.timestamp) &&
+    Number.isSafeInteger(decodedMessage.logical_clock) &&
     KNOWN_RESPONSE_STATUSES.includes(decodedMessage.status) &&
     isMap(decodedMessage.payload)
   );

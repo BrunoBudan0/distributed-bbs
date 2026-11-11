@@ -1,9 +1,12 @@
 from constants import (
     CHANNEL_FIELD,
     CHANNEL_NAME_PATTERN,
+    LOGICAL_CLOCK_FIELD,
+    MAX_LOGICAL_CLOCK,
     MAX_MESSAGE_LENGTH,
     MAX_TIMESTAMP_MS,
     MESSAGE_FIELD,
+    MIN_LOGICAL_CLOCK,
     MIN_MESSAGE_LENGTH,
     MIN_TIMESTAMP_MS,
     OPERATION_FIELD,
@@ -21,6 +24,7 @@ REQUIRED_FIELD_TYPES = {
     OPERATION_FIELD: str,
     SENDER_FIELD: str,
     TIMESTAMP_FIELD: int,
+    LOGICAL_CLOCK_FIELD: int,
     PAYLOAD_FIELD: dict,
 }
 KNOWN_OPERATION_NAMES = tuple(operation.value for operation in Operation)
@@ -29,6 +33,21 @@ OPERATIONS_NAMING_A_CHANNEL = (Operation.CREATE_CHANNEL, Operation.PUBLISH)
 
 def is_valid_timestamp(timestamp: object) -> bool:
     return type(timestamp) is int and MIN_TIMESTAMP_MS <= timestamp <= MAX_TIMESTAMP_MS
+
+
+def is_valid_logical_clock(logical_clock: object) -> bool:
+    return type(logical_clock) is int and MIN_LOGICAL_CLOCK <= logical_clock <= MAX_LOGICAL_CLOCK
+
+
+def valid_logical_clock_of(decoded_message: object) -> int | None:
+    if type(decoded_message) is not dict:
+        return None
+
+    received_logical_clock = decoded_message.get(LOGICAL_CLOCK_FIELD)
+    if is_valid_logical_clock(received_logical_clock):
+        return received_logical_clock
+
+    return None
 
 
 def operation_label_of(decoded_message: object) -> str:
@@ -58,6 +77,7 @@ def request_from(decoded_message: object) -> RequestMessage:
         operation=operation,
         sender=decoded_message[SENDER_FIELD],
         timestamp=decoded_message[TIMESTAMP_FIELD],
+        logical_clock=decoded_message[LOGICAL_CLOCK_FIELD],
         payload=decoded_message[PAYLOAD_FIELD],
     )
 
@@ -71,6 +91,9 @@ def refuse_malformed_envelope(decoded_message: object) -> None:
             raise MalformedMessage()
 
     if not is_valid_timestamp(decoded_message[TIMESTAMP_FIELD]):
+        raise MalformedMessage()
+
+    if not is_valid_logical_clock(decoded_message[LOGICAL_CLOCK_FIELD]):
         raise MalformedMessage()
 
 

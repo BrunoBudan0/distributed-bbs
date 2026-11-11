@@ -9,14 +9,16 @@ class PublicationMessage:
     operation: str
     sender: str
     timestamp: int
+    logical_clock: int
     payload: dict
 
     @classmethod
-    def from_publication(cls, publication: Publication) -> "PublicationMessage":
+    def from_publication(cls, publication: Publication, logical_clock: int) -> "PublicationMessage":
         return cls(
             operation=PUBLICATION_OPERATION,
             sender=publication.published_by_server,
             timestamp=publication.published_at_ms,
+            logical_clock=logical_clock,
             payload={
                 CHANNEL_FIELD: publication.channel_name,
                 AUTHOR_FIELD: publication.author_username,

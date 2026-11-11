@@ -2,6 +2,8 @@ export const RESPONSE_TIMEOUT_MS = 5000;
 export const LOGIN_RETRY_INTERVAL_MS = 2000;
 export const PUBLICATION_INTERVAL_MS = 1000;
 
+export const MAX_LOGICAL_CLOCK = 2 ** 52;
+
 export const MINIMUM_CHANNEL_COUNT = 5;
 export const MINIMUM_SUBSCRIPTION_COUNT = 3;
 export const MESSAGES_PER_BATCH = 10;

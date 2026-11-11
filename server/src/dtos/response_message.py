@@ -9,6 +9,7 @@ class ResponseMessage:
     operation: str
     sender: str
     timestamp: int
+    logical_clock: int
     status: ResponseStatus
     payload: dict
 

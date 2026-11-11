@@ -8,4 +8,5 @@ class RequestMessage:
     operation: Operation
     sender: str
     timestamp: int
+    logical_clock: int
     payload: dict

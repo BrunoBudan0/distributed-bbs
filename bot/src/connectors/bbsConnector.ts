@@ -1,5 +1,6 @@
 import { CHANNEL_FIELD, MESSAGE_FIELD } from "../constants.js";
 import { Operation, RequestMessage, ResponseMessage } from "../dtos/messages.js";
+import { LogicalClock } from "../models/logicalClock.js";
 import { responseFrom } from "../schemas/responseSchema.js";
 import { currentTimestampMs } from "../utils/clock.js";
 import { printReceivedMessage, printSentMessage } from "../utils/messagePrinter.js";
@@ -10,6 +11,7 @@ export class BbsConnector {
   constructor(
     private readonly username: string,
     private readonly brokerSocket: BrokerSocket,
+    private readonly logicalClock: LogicalClock,
   ) {}
 
   logIn(): Promise<ResponseMessage> {
@@ -33,6 +35,7 @@ export class BbsConnector {
       operation,
       sender: this.username,
       timestamp: currentTimestampMs(),
+      logical_clock: this.logicalClock.tickForSend(),
       payload,
     };
     printSentMessage(request);
@@ -40,6 +43,7 @@ export class BbsConnector {
     const encodedResponse = await this.brokerSocket.exchange(encodeMessage(request));
     const response = responseFrom(decodeMessage(encodedResponse));
     printReceivedMessage(response);
+    this.logicalClock.observe(response.logical_clock);
     return response;
   }
 }
