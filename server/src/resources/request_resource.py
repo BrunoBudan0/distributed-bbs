@@ -1,7 +1,7 @@
 from connectors import BrokerConnector
 from constants import CHANNEL_FIELD, CHANNELS_FIELD, MESSAGE_FIELD
 from controllers import ChannelController, LoginController, PublicationController
-from dtos import RequestMessage
+from dtos import ChannelHistory, RequestMessage
 from models import Channel, LogicalClock, Login, Operation, PhysicalClock, Publication
 from resources.message_answerer import MessageAnswerer
 from schemas import KNOWN_OPERATION_NAMES, request_from
@@ -30,6 +30,7 @@ class RequestResource:
             Operation.CREATE_CHANNEL: self.handle_create_channel,
             Operation.LIST_CHANNELS: self.handle_list_channels,
             Operation.PUBLISH: self.handle_publish,
+            Operation.CHANNEL_HISTORY: self.handle_channel_history,
         }
         self.message_answerer = MessageAnswerer(
             server_name, logical_clock, physical_clock, KNOWN_OPERATION_NAMES, request_from, self.handle_request
@@ -73,3 +74,8 @@ class RequestResource:
             )
         )
         return {}
+
+    def handle_channel_history(self, request: RequestMessage) -> dict:
+        channel_name = request.payload[CHANNEL_FIELD]
+        publications = self.publication_controller.channel_history_or_refuse(channel_name)
+        return ChannelHistory(channel_name, publications).as_fields()

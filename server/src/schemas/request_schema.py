@@ -18,7 +18,7 @@ from models import Operation
 from schemas.envelope_schema import refuse_malformed_envelope
 
 KNOWN_OPERATION_NAMES = tuple(operation.value for operation in Operation)
-OPERATIONS_NAMING_A_CHANNEL = (Operation.CREATE_CHANNEL, Operation.PUBLISH)
+OPERATIONS_NAMING_A_CHANNEL = (Operation.CREATE_CHANNEL, Operation.PUBLISH, Operation.CHANNEL_HISTORY)
 
 
 def request_from(decoded_message: object) -> RequestMessage:

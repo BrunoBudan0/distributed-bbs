@@ -1,6 +1,6 @@
 # Distributed BBS
 
-Sistema de troca de mensagens instantâneas inspirado no BBS e no IRC. Bots fazem login, criam canais públicos, se inscrevem neles e publicam mensagens. Todas as interações ficam gravadas em disco e replicadas em todos os servidores, todos os processos marcam as mensagens com um relógio lógico, os servidores elegem entre si um coordenador que sincroniza os relógios físicos pelo algoritmo de Berkeley, e podem entrar e sair sem parar o serviço nem perder dados.
+Sistema de troca de mensagens instantâneas inspirado no BBS e no IRC. Bots fazem login, criam canais públicos, se inscrevem neles, recebem as mensagens anteriores de cada canal e publicam mensagens. Todas as interações ficam gravadas em disco e replicadas em todos os servidores, todos os processos marcam as mensagens com um relógio lógico, os servidores elegem entre si um coordenador que sincroniza os relógios físicos pelo algoritmo de Berkeley, e podem entrar e sair sem parar o serviço nem perder dados.
 
 Projeto individual da disciplina de Sistemas Distribuídos (Ciência da Computação, FEI), de Bruno Budano Mello.
 
@@ -50,7 +50,7 @@ servidor (PUB) --> XSUB [ proxy ] XPUB --> (SUB servers, replication) server-1, 
 | `proxy` | Repassa as publicações dos servidores para os bots inscritos no canal | Python | Nenhum |
 | `reference` | Dá o rank de cada servidor e mantém a lista dos disponíveis por heartbeat | Python | Em memória |
 | `server-1`, `server-2` | Validam os pedidos, aplicam as regras, gravam em disco, publicam nos canais, replicam todos os dados entre si, elegem o coordenador e sincronizam o relógio com ele | Python | Um volume por servidor, cada um com todos os dados |
-| `bot-1`, `bot-2` | Usuários automáticos: fazem login, criam canais, se inscrevem e publicam | TypeScript | Nenhum |
+| `bot-1`, `bot-2` | Usuários automáticos: fazem login, criam canais, se inscrevem, pedem o histórico de cada canal assinado e publicam | TypeScript | Nenhum |
 
 Toda a comunicação usa a rede criada pelo Docker Compose. Nenhuma porta é publicada na máquina.
 
@@ -76,6 +76,29 @@ bot-2-1      | RECEIVED   | operation='publish' | sender='server-2' | timestamp=
 O relógio lógico salta de 28 para 32 porque o servidor já estava em 31: logo antes, ele trocou mensagens com outro processo e ficou com o maior valor.
 
 Na publicação recebida, `timestamp` é o envio pelo servidor e `received_at` é a chegada ao bot.
+
+Ao assinar um canal, o bot pede o histórico dele e mostra cada publicação anterior numa linha `HISTORY`. Para ver isso com um bot que entra depois, com o sistema no ar:
+
+```bash
+docker compose run -d --no-deps --name bot-3 -e BOT_USERNAME=bot-3 bot-1
+```
+
+```bash
+docker logs -f bot-3
+```
+
+Num ensaio, o `bot-3` entrou um minuto depois dos outros e mostrou, ao assinar o primeiro canal (a lista da resposta foi abreviada aqui; ela traz as 20 publicações, e cada uma vira uma linha `HISTORY`):
+
+```
+SUBSCRIBED | channel='general'
+SENT       | operation='channel_history' | sender='bot-3' | timestamp=2026-11-18T01:29:31.978Z | logical_clock=286 | payload={ channel: 'general' }
+RECEIVED   | operation='channel_history' | sender='server-1' | timestamp=2026-11-18T01:29:35.466Z | logical_clock=287 | status='success' | payload={ channel: 'general', publications: [ { author: 'bot-2', message: 'Essa música é ótima.', timestamp: 1794965339064, server: 'server-2' }, ... ] }
+HISTORY    | channel='general' | author='bot-2' | message='Essa música é ótima.' | timestamp=2026-11-18T01:28:59.064Z | server='server-2' | received_at=2026-11-18T01:29:31.981Z
+HISTORY    | channel='general' | author='bot-2' | message='Até mais tarde!' | timestamp=2026-11-18T01:29:00.075Z | server='server-2' | received_at=2026-11-18T01:29:31.981Z
+HISTORY    | channel='general' | author='bot-2' | message='Qual é a novidade de hoje?' | timestamp=2026-11-18T01:29:01.083Z | server='server-1' | received_at=2026-11-18T01:29:31.981Z
+```
+
+Quem respondeu foi o `server-1`, mas as publicações foram aceitas pelos dois servidores: é a replicação aparecendo para o usuário. Em cada linha `HISTORY`, `timestamp` é o horário da publicação e `received_at` é a chegada do histórico ao bot. O `received_at` fica antes do `timestamp` da resposta porque os servidores estão 3,5 s à frente da máquina, pela média de Berkeley explicada a seguir.
 
 Ao subir, cada servidor pede o rank e faz uma eleição. O de rank maior vence e se anuncia no tópico `servers`:
 
@@ -136,6 +159,9 @@ Operações atendidas pelos servidores, pedidas pelos bots:
 | `create_channel` | `{channel: "nome"}` | `{}` |
 | `list_channels` | `{}` | `{channels: ["nome", ...]}` |
 | `publish` | `{channel: "nome", message: "texto"}` | `{}` |
+| `channel_history` | `{channel: "nome"}` | `{channel: "nome", publications: [{author, message, timestamp, server}, ...]}`: as 20 publicações mais recentes do canal, da mais antiga para a mais nova |
+
+No histórico, `timestamp` é o horário em que a publicação foi feita e `server` é o servidor que a aceitou, que pode ser outro que não o que respondeu.
 
 Operações atendidas pela referência, pedidas pelos servidores (o `sender` é o nome do servidor):
 
@@ -169,7 +195,7 @@ Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 | `INVALID_USERNAME` | Servidor | O nome do usuário está fora do formato permitido |
 | `INVALID_CHANNEL_NAME` | Servidor | O nome do canal está fora do formato permitido ou é `servers` ou `replication`, tópicos reservados aos servidores |
 | `CHANNEL_ALREADY_EXISTS` | Servidor | Já existe canal com esse nome no servidor que atendeu |
-| `CHANNEL_NOT_FOUND` | Servidor | Pedido de publicação num canal que não existe no servidor que atendeu |
+| `CHANNEL_NOT_FOUND` | Servidor | Pedido de publicação ou de histórico num canal que não existe no servidor que atendeu |
 | `INVALID_MESSAGE` | Servidor | A mensagem não é texto ou está fora do tamanho permitido |
 | `INVALID_SERVER_NAME` | Referência e servidor | O nome do servidor que pede está fora do formato permitido |
 | `UNKNOWN_SERVER` | Referência | Heartbeat de um servidor que nunca pediu rank |
@@ -187,6 +213,8 @@ Uma resposta com erro traz `{error_code, error_description}` no `payload`.
 | Canal duplicado | Recusado com `CHANNEL_ALREADY_EXISTS` | O canal original continua o mesmo |
 | Publicação em canal inexistente | Recusada com `CHANNEL_NOT_FOUND`, sem gravar nem publicar | Só se publica em canal criado no servidor |
 | Ordem da publicação | Grava em disco, publica no tópico, responde ao bot | Se o servidor cair no meio, a publicação fica guardada em vez de se perder |
+| Histórico do canal | As 20 publicações mais recentes, da mais antiga para a mais nova, pelo horário da publicação; no empate, pelo nome do servidor, do autor, pelo horário do pedido e pela mensagem | O horário vem do relógio físico sincronizado por Berkeley, e o desempate só usa dados replicados, então qualquer servidor devolve a mesma lista |
+| Tamanho do histórico | 20 publicações | Um bot publica 10 mensagens por rodada; 20 cobrem as duas últimas rodadas num canal sem deixar a resposta grande |
 | Erro ou timeout no login | O bot repete o login a cada 2 s até ser aceito | Exigência do enunciado |
 | Timeout de resposta | 5 s no bot, 2 s no servidor falando com a referência e 1 s entre servidores; quem pediu descarta o socket `REQ` e abre outro | Um `REQ` sem resposta fica preso e não aceita novo envio |
 
@@ -224,8 +252,10 @@ A cada rodada, o bot:
 
 1. Lista os canais.
 2. Se a lista tiver menos de 5 canais, cria um canal sorteado entre os do catálogo fixo (`general`, `news`, `sports`, `music`, `movies`) que não estão na lista.
-3. Se estiver inscrito em menos de 3 canais, se inscreve em um canal da lista, sorteado entre os que ainda não assina.
+3. Se estiver inscrito em menos de 3 canais, se inscreve em um canal da lista, sorteado entre os que ainda não assina, e pede o histórico desse canal (`channel_history`), mostrando cada publicação antiga numa linha `HISTORY`.
 4. Sorteia um canal da lista e envia 10 mensagens sorteadas de um catálogo, uma por segundo.
+
+O pedido de histórico não está no comportamento padronizado do enunciado. Ele foi acrescentado para cumprir o objetivo geral do projeto, em que o usuário consegue recuperar as mensagens anteriores: sem ele, quem assina um canal só vê o que for publicado dali em diante, porque `PUB`/`SUB` só entrega a quem já está inscrito. O bot assina antes de pedir o histórico: assim, uma publicação feita nesse meio-tempo tende a aparecer duas vezes, no histórico e ao vivo, em vez de nenhuma.
 
 O enunciado descreve os passos 2 e 3 "ao conectar". Eles são repetidos em toda rodada porque, feitos uma vez só, cada bot terminaria com 1 inscrição e o sistema com 2 canais. Repetindo, o bot chega aos 5 canais e às 3 inscrições, e a primeira rodada continua igual à descrição.
 
@@ -285,6 +315,8 @@ Numa execução com os bots publicando, os bancos dos servidores foram comparado
 
 Nos três casos há um registro a mais do que linhas gravadas: um canal foi criado ao mesmo tempo nos dois servidores, os dois registros ficaram no log, e todos os servidores mantiveram a mesma criação vencedora.
 
+O histórico do canal mostra a replicação do lado do usuário. Num ensaio, um `bot-3` que entrou um minuto depois dos outros recebeu, ao assinar `general`, `sports` e `music`, 20, 20 e 10 publicações anteriores, aceitas pelos dois servidores. Com os bots parados, o histórico dos 5 canais foi pedido várias vezes pelo broker, que alternou entre o `server-1` e o `server-2`, e as listas dos dois vieram idênticas em todos os canais.
+
 ## Escolhas e seus custos
 
 | Assunto | Escolha | Alternativa descartada | Custo da escolha |
@@ -297,6 +329,8 @@ Nos três casos há um registro a mais do que linhas gravadas: um canal foi cria
 | Isolamento dos caminhos | Um contexto ZeroMQ por caminho: pedidos dos bots, publicações, referência, pedidos entre servidores e anúncios, no servidor e no bot | Um contexto só por processo | Com um contexto só, a queda do proxy travava também os pedidos: cada tentativa de reconexão consulta o DNS por 3,5 s no mesmo thread de I/O. Separados, a queda do proxy não atrasa nenhuma resposta |
 | Tópico | Nome do canal no primeiro frame; o bot confere se o tópico é exatamente um canal assinado | Confiar só no filtro do ZeroMQ, que compara por prefixo e entregaria `news-br` a quem assina `news` | Uma verificação a mais no bot |
 | Publicações em disco | Tabela `publication` com canal, autor, mensagem, horário do pedido, horário da publicação e servidor que publicou | Gravar só o texto | Mais colunas, mas qualquer informação pode ser recuperada depois |
+| Mensagens anteriores | Operação `channel_history`, de pedido e resposta, com as 20 publicações mais recentes do canal | Reenviar as publicações antigas no tópico quando alguém assina: a inscrição para no proxy, o servidor nem fica sabendo dela, e todos os inscritos receberiam tudo de novo | Só as 20 mais recentes; as anteriores continuam no disco, sem paginação |
+| Ordem do histórico | Horário da publicação, que vem do relógio físico sincronizado, com desempate pelos outros campos | Relógio lógico de Lamport: exigiria gravar o relógio lógico em cada publicação e mudar o formato do registro replicado | Antes da primeira rodada de Berkeley, uma publicação do `server-2`, adiantado 7 s, fica depois das que o `server-1` fez no mesmo instante |
 | Timestamp do login e do pedido | O da mensagem do bot | Relógio do servidor | Confia no relógio do cliente |
 | Sincronização do relógio físico | Berkeley com o coordenador eleito, no formato pedido pelo enunciado: cada servidor manda o próprio relógio e recebe a hora combinada | Berkeley clássico, com o coordenador consultando todos os servidores de uma vez: o enunciado define o servidor como quem pergunta | A média só usa as leituras recebidas nos últimos 60 s |
 | Hora no pedido de relógio | O próprio `timestamp` do pedido, que já é o relógio de quem pede | Um campo a mais no `payload` | Nenhum; o `timestamp` existe em toda mensagem |
@@ -317,7 +351,9 @@ Nos três casos há um registro a mais do que linhas gravadas: um canal foi cria
 | Dois bots criam o mesmo canal ao mesmo tempo | Os dois recebem sucesso, e os servidores ficam com uma só criação, a de menor relógio lógico | Cada servidor decide a criação sozinho; o conflito é resolvido depois |
 | Antientropia depende de tráfego | Sem mensagens de clientes e sem troca de coordenador, um registro perdido pela difusão espera até o próximo pedido | O enunciado amarra os gatilhos periódicos ao número de mensagens |
 | O log cresce sempre | A tabela `replicated_record` guarda cada escrita para sempre | Sem compactação; para o tamanho do projeto não pesa |
-| Publicação não espera inscrito | Quem se inscreve depois não recebe as publicações anteriores, que continuam gravadas em disco | `PUB`/`SUB` entrega só para quem já está inscrito no momento do envio |
+| Histórico limitado | Quem se inscreve depois recebe as 20 publicações mais recentes do canal; as anteriores continuam gravadas em disco, sem operação para buscá-las | Resposta de tamanho fixo, sem paginação |
+| Borda entre histórico e ao vivo | Uma publicação feita no instante da inscrição pode aparecer duas vezes, no histórico e ao vivo, e raramente nenhuma | A inscrição leva alguns milissegundos para chegar ao proxy, e a publicação aceita por outro servidor pode ainda não ter sido replicada para quem responde o histórico |
+| Histórico logo depois de criar o canal | Se o pedido cair no servidor que ainda não recebeu o canal, a resposta é `CHANNEL_NOT_FOUND` e o bot segue sem histórico daquele canal | Consistência eventual; o bot não repete o pedido |
 | Servidor ocioso sai da lista | Um servidor que fica 30 s sem receber 10 mensagens de clientes não manda heartbeat e é removido, mesmo vivo | O enunciado amarra o heartbeat ao número de mensagens, não ao tempo |
 | Referência fora do ar | Os bots continuam sendo atendidos, mas cada heartbeat espera 2 s antes de desistir, e a lista de servidores usada na eleição fica parada na última versão | A referência é um processo único |
 | Berkeley não busca a hora certa | Com o atraso simulado de 7 s, o grupo concorda em cerca de +3,5 s em relação à máquina; se o servidor adiantado reinicia, o acordo se desloca de novo (numa execução, para +5,2 s) | Berkeley faz a média do grupo e não tem fonte de hora externa |
@@ -329,11 +365,11 @@ Nos três casos há um registro a mais do que linhas gravadas: um canal foi cria
 
 | Suíte | Como roda | O que testa |
 |---|---|---|
-| Black-box do sistema (`tests/`, pytest) | Container na rede do Compose, falando com o broker, o proxy, a referência e a porta 5560 do `server-1` como um cliente qualquer | Login, canais, publicação, entrega aos inscritos, relógio lógico, protocolo da referência, eleição, anúncio, Berkeley, replicação e o que fica gravado em disco |
-| Unitários do servidor (`server/tests/`, pytest) | Na construção da imagem do servidor; a imagem não é gerada se um teste falhar | Relógio lógico, média de Berkeley, regras da eleição, sincronização a cada 15 mensagens, heartbeat a cada 10, log de registros e antientropia |
-| Unitários dos bots (`bot/tests/`, `node:test`) | Na construção da imagem do bot; a imagem não é gerada se um teste falhar | Relógio lógico e as decisões de criar, assinar e publicar |
+| Black-box do sistema (`tests/`, pytest) | Container na rede do Compose, falando com o broker, o proxy, a referência e a porta 5560 do `server-1` como um cliente qualquer | Login, canais, publicação, entrega aos inscritos, histórico do canal, relógio lógico, protocolo da referência, eleição, anúncio, Berkeley, replicação e o que fica gravado em disco |
+| Unitários do servidor (`server/tests/`, pytest) | Na construção da imagem do servidor; a imagem não é gerada se um teste falhar | Relógio lógico, média de Berkeley, regras da eleição, sincronização a cada 15 mensagens, heartbeat a cada 10, log de registros, antientropia e ordem do histórico |
+| Unitários dos bots (`bot/tests/`, `node:test`) | Na construção da imagem do bot; a imagem não é gerada se um teste falhar | Relógio lógico, as decisões de criar, assinar e publicar, o pedido de histórico ao assinar e a validação da resposta do histórico |
 
-A suíte black-box só lê o arquivo do `server-1`, em modo somente leitura, para conferir logins e publicações gravados, porque o protocolo não tem operação que devolva esse histórico. Os testes da referência usam um segundo serviço de referência, `reference-under-test`, com prazo de heartbeat de 1,5 s, para provar a remoção sem esperar 30 s. Para provar a troca de coordenador, um teste publica no tópico `servers` o anúncio de um coordenador que não existe e confere que o `server-1` percebe a falta dele e assume. Os testes que mudam um relógio usado pelos demais levam a marcação `changes_shared_clock` e rodam por último.
+A suíte black-box só lê o arquivo do `server-1`, em modo somente leitura, para conferir os logins e todos os campos gravados de uma publicação, porque o protocolo não devolve logins e o histórico do canal traz só autor, mensagem, horário e servidor. Os testes da referência usam um segundo serviço de referência, `reference-under-test`, com prazo de heartbeat de 1,5 s, para provar a remoção sem esperar 30 s. Para provar a troca de coordenador, um teste publica no tópico `servers` o anúncio de um coordenador que não existe e confere que o `server-1` percebe a falta dele e assume. Os testes que mudam um relógio usado pelos demais levam a marcação `changes_shared_clock` e rodam por último.
 
 ```bash
 docker compose -p distributed-bbs-test --profile test run --rm --build tests
@@ -360,6 +396,7 @@ npm test
 | `tests/test_login.py` | Login aceito, formato do nome e gravação em disco |
 | `tests/test_channels.py` | Criação, duplicidade, formato do nome e listagem |
 | `tests/test_publications.py` | Publicação, entrega no tópico certo, timestamp, gravação em disco e recusas que não gravam nem publicam |
+| `tests/test_history.py` | Ordem do histórico, limite de 20, canal vazio, só o canal pedido, publicação replicada de outro servidor, mesma entrada que a entrega ao vivo e recusas |
 | `tests/test_protocol.py` | Formato binário, campos obrigatórios, limites do timestamp e do relógio lógico, operação desconhecida |
 | `tests/test_logical_clock.py` | Relógio lógico do servidor nas respostas, nas recusas e nas publicações |
 | `tests/test_reference.py` | Rank, lista, heartbeat sem hora, remoção por silêncio, volta com o mesmo rank e cadastro do `server-1` |
@@ -372,7 +409,10 @@ npm test
 | `server/tests/test_replication_repository.py` | Sequência por origem, gravação única, marca d'água e limite por troca, num SQLite em memória |
 | `server/tests/test_replication_controller.py` | Aplicação idempotente, conflito de canal, antientropia nos dois sentidos e coordenador fora do ar |
 | `server/tests/test_channel.py` | Regra do vencedor no conflito de canal |
+| `server/tests/test_publication_repository.py` | Ordem e limite do histórico, filtro por canal e o mesmo desempate em qualquer réplica, num SQLite em memória |
 | `bot/tests/botDecisions.test.ts` | Números padronizados do enunciado e as decisões de criar, assinar e publicar |
+| `bot/tests/botController.test.ts` | Pedido de histórico logo depois de assinar e bot que segue publicando quando o histórico é recusado |
+| `bot/tests/responseSchema.test.ts` | Validação da resposta do histórico |
 | `bot/tests/logicalClock.test.ts` | Relógio lógico do bot |
 
 ## Se algo falhar
@@ -382,6 +422,7 @@ npm test
 | Bot mostra `TIMEOUT` em sequência | Nenhum servidor conectado ao broker | Conferir com `docker compose ps` e subir um servidor; o bot volta sozinho |
 | Bot publica mas nenhum bot recebe | O proxy caiu ou ninguém assina aquele canal | Conferir o `proxy` com `docker compose ps`; as linhas `SUBSCRIBED` mostram o que cada bot assina |
 | `CHANNEL_NOT_FOUND` logo depois de criar um canal | A difusão do canal ainda não chegou ao servidor que atendeu | Raro e passageiro; some em milissegundos |
+| Bot assina um canal e não mostra nenhuma linha `HISTORY` | O canal ainda não tinha publicações, ou o pedido caiu num servidor que ainda não recebeu o canal (`CHANNEL_NOT_FOUND`) | Esperado; as publicações seguintes chegam ao vivo |
 | Servidor para com "schema version" no log | Volume de dados de uma parte anterior | `docker compose down -v` |
 | Servidores respondem com horário alguns segundos à frente da máquina | Atraso simulado de 7 s no `server-2` e média de Berkeley | Esperado; os servidores concordam entre si. Para tirar o atraso, apague `SIMULATED_CLOCK_SKEW_MS` do compose |
 | Servidor mostra `TIMEOUT` ao falar com outro servidor | O outro servidor caiu | Esperado; se era o coordenador, há eleição e um novo coordenador se anuncia |
@@ -424,6 +465,7 @@ npm test
 | Publicação | `Publication`, `PublicationMessage` | Pedido de publicação (`publish`), que é o que o bot envia ao servidor |
 | Autor | `author`, `author_username` | `sender` da publicação, que é o servidor |
 | Inscrição | `subscribe` | Login; a inscrição é só do lado do bot e não passa pelo servidor |
+| Histórico do canal | `channel_history`, linhas `HISTORY` no bot | Log de registros replicados; o histórico é o que o bot vê das publicações anteriores de um canal |
 | Relógio lógico | `logical_clock`, `LogicalClock` | `timestamp`, que é o relógio físico |
 | Relógio físico | `PhysicalClock`, `offset_ms` | Relógio do sistema operacional, que não é alterado |
 | Referência | `reference` | Broker; a referência só conversa com servidores |
@@ -448,4 +490,4 @@ Cada parte é desenvolvida em uma branch própria.
 | 2 | `parte-2` | Publicação em canais com `PUB`/`SUB`, proxy, inscrições dos bots e persistência das publicações |
 | 3 | `parte-3` | Relógio lógico em todas as mensagens, serviço de referência com rank, lista e heartbeat, sincronização do relógio físico |
 | 4 | `parte-4` | Eleição do coordenador (Bully), anúncio no tópico `servers` e sincronização dos relógios por Berkeley com o coordenador |
-| 5 | `parte-5` | Replicação de todos os dados em todos os servidores: difusão no tópico `replication`, antientropia com o coordenador e conflito resolvido pelo relógio lógico |
+| 5 | `parte-5` | Replicação de todos os dados em todos os servidores: difusão no tópico `replication`, antientropia com o coordenador e conflito resolvido pelo relógio lógico. Histórico do canal (`channel_history`) para quem assina depois |

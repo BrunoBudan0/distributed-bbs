@@ -6,6 +6,7 @@ class Operation(StrEnum):
     CREATE_CHANNEL = "create_channel"
     LIST_CHANNELS = "list_channels"
     PUBLISH = "publish"
+    CHANNEL_HISTORY = "channel_history"
 
 
 class PeerOperation(StrEnum):

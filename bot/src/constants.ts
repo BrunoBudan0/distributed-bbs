@@ -26,6 +26,7 @@ export const MESSAGE_CATALOG = [
 export const CHANNEL_FIELD = "channel";
 export const CHANNELS_FIELD = "channels";
 export const MESSAGE_FIELD = "message";
+export const PUBLICATIONS_FIELD = "publications";
 export const TIMESTAMP_FIELD = "timestamp";
 
 export const BROKER_ENDPOINT_VARIABLE = "BROKER_CLIENT_ENDPOINT";

@@ -8,7 +8,7 @@ class MalformedMessage(BbsError):
 
 class UnknownOperation(BbsError):
     code = "UNKNOWN_OPERATION"
-    description = "the operation must be login, create_channel, list_channels or publish"
+    description = "the operation must be login, create_channel, list_channels, publish or channel_history"
 
 
 class UnknownPeerOperation(BbsError):

@@ -1,5 +1,6 @@
+from helpers.assertions import setup_succeeded
 from helpers.names import new_username
-from helpers.protocol import CREATE_CHANNEL, LIST_CHANNELS, LOGIN, PUBLISH
+from helpers.protocol import CHANNEL_HISTORY, CREATE_CHANNEL, LIST_CHANNELS, LOGIN, PUBLISH
 from helpers.request_exchange import RequestClient
 
 
@@ -29,3 +30,13 @@ class BbsClient(RequestClient):
         return self.exchange_message(
             self.valid_request(PUBLISH, sender, {"channel": channel_name, "message": message}, timestamp, logical_clock)
         )
+
+    def channel_history(self, channel_name: object) -> dict:
+        return self.exchange_message(self.valid_request(CHANNEL_HISTORY, new_username(), {"channel": channel_name}))
+
+    def history_entries(self, channel_name: str) -> list[dict]:
+        response = setup_succeeded(self.channel_history(channel_name), "channel history")
+        return response["payload"]["publications"]
+
+    def history_messages(self, channel_name: str) -> list[str]:
+        return [history_entry["message"] for history_entry in self.history_entries(channel_name)]

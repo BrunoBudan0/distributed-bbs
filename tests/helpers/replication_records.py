@@ -32,13 +32,19 @@ def channel_record(origin_server: str, origin_sequence: int, channel_name: str, 
     return replicated_record(origin_server, origin_sequence, CHANNEL_KIND, created_logical_clock, content)
 
 
-def publication_record(origin_server: str, origin_sequence: int, channel_name: str, author_username: str) -> dict:
+def publication_record(
+    origin_server: str,
+    origin_sequence: int,
+    channel_name: str,
+    author_username: str,
+    published_at_ms: int | None = None,
+) -> dict:
     content = {
         "channel_name": channel_name,
         "author_username": author_username,
         "message": "replicated message",
         "requested_at_ms": current_timestamp_ms(),
-        "published_at_ms": current_timestamp_ms(),
+        "published_at_ms": current_timestamp_ms() if published_at_ms is None else published_at_ms,
         "published_by_server": origin_server,
     }
     return replicated_record(origin_server, origin_sequence, PUBLICATION_KIND, RECORD_LOGICAL_CLOCK, content)

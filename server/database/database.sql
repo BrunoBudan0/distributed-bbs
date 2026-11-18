@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS publication (
     published_by_server TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS ix_publication_channel_published_at ON publication (channel_name, published_at_ms);
+
 CREATE TABLE IF NOT EXISTS replicated_record (
     id INTEGER PRIMARY KEY,
     origin_server TEXT NOT NULL,

@@ -24,3 +24,21 @@ class PublicationRepository:
                 publication.published_by_server,
             ),
         )
+
+    def latest_publications_of(self, channel_name: str, limit: int) -> list[Publication]:
+        newest_first_rows = self.database_connection.execute(
+            """
+            SELECT channel_name, author_username, message, requested_at_ms, published_at_ms, published_by_server
+            FROM publication
+            WHERE channel_name = ?
+            ORDER BY
+                published_at_ms DESC,
+                published_by_server DESC,
+                author_username DESC,
+                requested_at_ms DESC,
+                message DESC
+            LIMIT ?
+            """,
+            (channel_name, limit),
+        ).fetchall()
+        return [Publication(*row) for row in reversed(newest_first_rows)]
