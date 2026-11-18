@@ -30,6 +30,10 @@ export class BbsConnector {
     return this.exchange(Operation.Publish, { [CHANNEL_FIELD]: channelName, [MESSAGE_FIELD]: message });
   }
 
+  channelHistory(channelName: string): Promise<ResponseMessage> {
+    return this.exchange(Operation.ChannelHistory, { [CHANNEL_FIELD]: channelName });
+  }
+
   private async exchange(operation: Operation, payload: Record<string, string>): Promise<ResponseMessage> {
     const request: RequestMessage = {
       operation,

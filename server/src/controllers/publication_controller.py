@@ -1,6 +1,7 @@
 import sqlite3
 
 from connectors import ChannelPublisher
+from constants import CHANNEL_HISTORY_LIMIT
 from controllers.replication_log import ReplicationLog
 from errors import ChannelNotFound
 from models import Publication, RecordKind
@@ -31,6 +32,10 @@ class PublicationController:
 
         self.channel_publisher.publish(publication)
         self.replication_log.share(record)
+
+    def channel_history_or_refuse(self, channel_name: str) -> list[Publication]:
+        self.refuse_unknown_channel(channel_name)
+        return self.publication_repository.latest_publications_of(channel_name, CHANNEL_HISTORY_LIMIT)
 
     def refuse_unknown_channel(self, channel_name: str) -> None:
         if not self.channel_repository.exists(channel_name):

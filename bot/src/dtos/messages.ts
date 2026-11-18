@@ -3,6 +3,7 @@ export enum Operation {
   CreateChannel = "create_channel",
   ListChannels = "list_channels",
   Publish = "publish",
+  ChannelHistory = "channel_history",
 }
 
 export enum ResponseStatus {
@@ -37,4 +38,11 @@ export interface PublicationMessage {
     author: string;
     message: string;
   };
+}
+
+export interface HistoryPublication {
+  author: string;
+  message: string;
+  timestamp: number;
+  server: string;
 }

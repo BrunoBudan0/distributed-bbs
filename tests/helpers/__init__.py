@@ -11,6 +11,8 @@ from helpers.names import new_channel_name, new_server_name, new_username
 from helpers.peer_client import PeerClient
 from helpers.protocol import (
     CHANNEL_ALREADY_EXISTS,
+    CHANNEL_HISTORY,
+    CHANNEL_HISTORY_LIMIT,
     CHANNEL_NOT_FOUND,
     CLOCK,
     COORDINATOR_ANNOUNCEMENT,
@@ -55,6 +57,8 @@ from helpers.waiting import condition_holds_within
 __all__ = [
     "BbsClient",
     "CHANNEL_ALREADY_EXISTS",
+    "CHANNEL_HISTORY",
+    "CHANNEL_HISTORY_LIMIT",
     "CHANNEL_NOT_FOUND",
     "CLOCK",
     "COORDINATOR_ANNOUNCEMENT",

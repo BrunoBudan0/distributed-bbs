@@ -11,8 +11,9 @@ import {
 } from "../constants.js";
 import { ResponseStatus } from "../dtos/messages.js";
 import { BrokerTimeout } from "../errors/customErrors.js";
-import { channelNamesFrom } from "../schemas/responseSchema.js";
-import { printBrokerTimeout } from "../utils/messagePrinter.js";
+import { channelNamesFrom, historyPublicationsFrom } from "../schemas/responseSchema.js";
+import { currentTimestampMs } from "../utils/clock.js";
+import { printBrokerTimeout, printChannelHistory } from "../utils/messagePrinter.js";
 import { pickRandomItem } from "../utils/random.js";
 import { waitMilliseconds } from "../utils/waiting.js";
 import { channelToCreate, channelToPublishIn, channelToSubscribe } from "./botDecisions.js";
@@ -62,7 +63,7 @@ export class BotController {
   private async runRound(): Promise<void> {
     const listedChannelNames = channelNamesFrom(await this.bbsConnector.listChannels());
     await this.createChannelIfBelowMinimum(listedChannelNames);
-    this.subscribeIfBelowMinimum(listedChannelNames);
+    await this.subscribeIfBelowMinimum(listedChannelNames);
     await this.publishBatch(channelToPublishIn(listedChannelNames, pickRandomItem));
   }
 
@@ -73,7 +74,7 @@ export class BotController {
     }
   }
 
-  private subscribeIfBelowMinimum(listedChannelNames: string[]): void {
+  private async subscribeIfBelowMinimum(listedChannelNames: string[]): Promise<void> {
     const channelName = channelToSubscribe(
       listedChannelNames,
       this.channelSubscriber.subscribedChannels(),
@@ -82,6 +83,14 @@ export class BotController {
     );
     if (channelName !== undefined) {
       this.channelSubscriber.subscribe(channelName);
+      await this.showChannelHistory(channelName);
+    }
+  }
+
+  private async showChannelHistory(channelName: string): Promise<void> {
+    const historyResponse = await this.bbsConnector.channelHistory(channelName);
+    if (historyResponse.status === ResponseStatus.Success) {
+      printChannelHistory(channelName, historyPublicationsFrom(historyResponse), currentTimestampMs());
     }
   }
 

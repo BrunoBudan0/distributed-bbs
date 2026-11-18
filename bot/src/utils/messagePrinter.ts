@@ -1,17 +1,18 @@
 import { inspect } from "node:util";
 
 import { TIMESTAMP_FIELD } from "../constants.js";
-import { PublicationMessage, RequestMessage, ResponseMessage } from "../dtos/messages.js";
+import { HistoryPublication, PublicationMessage, RequestMessage, ResponseMessage } from "../dtos/messages.js";
 import { BrokerTimeout } from "../errors/customErrors.js";
 
 const SENT_LABEL = "SENT";
 const RECEIVED_LABEL = "RECEIVED";
+const HISTORY_LABEL = "HISTORY";
 const TIMEOUT_LABEL = "TIMEOUT";
 const SUBSCRIBED_LABEL = "SUBSCRIBED";
 const LABEL_WIDTH = SUBSCRIBED_LABEL.length;
 const FIELD_SEPARATOR = " | ";
 
-type PrintableMessage = RequestMessage | ResponseMessage | PublicationMessage;
+type PrintableMessage = RequestMessage | ResponseMessage | PublicationMessage | HistoryPublication;
 
 export function printSentMessage(request: RequestMessage): void {
   printLine(SENT_LABEL, describedMessage(request));
@@ -28,6 +29,23 @@ export function printReceivedPublication(topic: string, publication: Publication
       FIELD_SEPARATOR,
     ),
   );
+}
+
+export function printChannelHistory(
+  channelName: string,
+  historyPublications: HistoryPublication[],
+  receivedAtMs: number,
+): void {
+  for (const historyPublication of historyPublications) {
+    printLine(
+      HISTORY_LABEL,
+      [
+        `channel=${inspect(channelName)}`,
+        describedMessage(historyPublication),
+        `received_at=${readableTimestamp(receivedAtMs)}`,
+      ].join(FIELD_SEPARATOR),
+    );
+  }
 }
 
 export function printSubscription(channelName: string): void {
