@@ -33,6 +33,12 @@ class ServerDatabase:
         )
         return [StoredPublication(*row) for row in rows]
 
+    def channel_creation(self, channel_name: str) -> tuple[str, str] | None:
+        rows = self.rows(
+            "SELECT created_by_username, created_on_server FROM channel WHERE name = ?", (channel_name,)
+        )
+        return rows[0] if rows else None
+
     def rows(self, query: str, parameters: tuple) -> list[tuple]:
         with closing(sqlite3.connect(self.read_only_uri, uri=True)) as database_connection:
             return database_connection.execute(query, parameters).fetchall()

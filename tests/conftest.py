@@ -5,6 +5,7 @@ import pytest
 
 from helpers import (
     COORDINATOR_TOPIC,
+    REPLICATION_TOPIC,
     BbsClient,
     ChannelSubscriber,
     CoordinatorImpersonator,
@@ -43,6 +44,14 @@ def announcement_listener() -> Iterator[ChannelSubscriber]:
     coordinator_topic_subscriber.subscribe(COORDINATOR_TOPIC)
     yield coordinator_topic_subscriber
     coordinator_topic_subscriber.close()
+
+
+@pytest.fixture
+def replication_listener() -> Iterator[ChannelSubscriber]:
+    replication_topic_subscriber = ChannelSubscriber(os.environ["PROXY_SUBSCRIBER_ENDPOINT"])
+    replication_topic_subscriber.subscribe(REPLICATION_TOPIC)
+    yield replication_topic_subscriber
+    replication_topic_subscriber.close()
 
 
 @pytest.fixture

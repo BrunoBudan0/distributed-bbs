@@ -11,6 +11,8 @@ class Operation(StrEnum):
 class PeerOperation(StrEnum):
     ELECTION = "election"
     CLOCK = "clock"
+    REPLICATION_SYNC = "replication_sync"
+    REPLICATION_PUSH = "replication_push"
 
 
 class ReferenceOperation(StrEnum):
@@ -22,3 +24,9 @@ class ReferenceOperation(StrEnum):
 class ResponseStatus(StrEnum):
     SUCCESS = "success"
     ERROR = "error"
+
+
+class RecordKind(StrEnum):
+    LOGIN = "login"
+    CHANNEL = "channel"
+    PUBLICATION = "publication"

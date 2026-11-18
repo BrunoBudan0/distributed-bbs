@@ -13,7 +13,12 @@ class UnknownOperation(BbsError):
 
 class UnknownPeerOperation(BbsError):
     code = "UNKNOWN_OPERATION"
-    description = "the operation between servers must be election or clock"
+    description = "the operation between servers must be election, clock, replication_sync or replication_push"
+
+
+class InvalidReplicatedRecord(BbsError):
+    code = "INVALID_RECORD"
+    description = "every replicated record needs a valid origin, a sequence from 1, a known kind and a valid content"
 
 
 class InvalidUsername(BbsError):
@@ -28,7 +33,9 @@ class InvalidServerName(BbsError):
 
 class InvalidChannelName(BbsError):
     code = "INVALID_CHANNEL_NAME"
-    description = "the channel name must have 1 to 32 lowercase letters, digits or hyphens and cannot be 'servers'"
+    description = (
+        "the channel name must have 1 to 32 lowercase letters, digits or hyphens and cannot be 'servers' or 'replication'"
+    )
 
 
 class ChannelAlreadyExists(BbsError):

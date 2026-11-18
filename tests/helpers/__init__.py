@@ -20,6 +20,7 @@ from helpers.protocol import (
     HEARTBEAT,
     INVALID_CHANNEL_NAME,
     INVALID_MESSAGE,
+    INVALID_RECORD,
     INVALID_SERVER_NAME,
     INVALID_USERNAME,
     LIST_CHANNELS,
@@ -35,6 +36,10 @@ from helpers.protocol import (
     PUBLISH,
     RANK,
     REFERENCE_NAME,
+    REPLICATED_RECORD,
+    REPLICATION_PUSH,
+    REPLICATION_SYNC,
+    REPLICATION_TOPIC,
     TESTED_SERVER_NAME,
     UNIDENTIFIED_OPERATION,
     UNKNOWN_OPERATION,
@@ -42,6 +47,7 @@ from helpers.protocol import (
 )
 from helpers.publication_scenarios import new_created_channel, new_ready_channel, publications_before_barrier
 from helpers.reference_client import ReferenceClient
+from helpers.replication_records import channel_record, login_record, publication_record
 from helpers.request_exchange import current_timestamp_ms
 from helpers.server_database import ServerDatabase, StoredPublication
 from helpers.waiting import condition_holds_within
@@ -60,6 +66,7 @@ __all__ = [
     "HEARTBEAT",
     "INVALID_CHANNEL_NAME",
     "INVALID_MESSAGE",
+    "INVALID_RECORD",
     "INVALID_SERVER_NAME",
     "INVALID_USERNAME",
     "LIST_CHANNELS",
@@ -76,6 +83,10 @@ __all__ = [
     "PeerClient",
     "RANK",
     "REFERENCE_NAME",
+    "REPLICATED_RECORD",
+    "REPLICATION_PUSH",
+    "REPLICATION_SYNC",
+    "REPLICATION_TOPIC",
     "ReferenceClient",
     "ServerDatabase",
     "StoredPublication",
@@ -87,13 +98,16 @@ __all__ = [
     "announcement_of_coordinator_after_client_messages",
     "assert_refused",
     "assert_succeeded",
+    "channel_record",
     "condition_holds_within",
     "current_timestamp_ms",
+    "login_record",
     "new_channel_name",
     "new_created_channel",
     "new_ready_channel",
     "new_server_name",
     "new_username",
+    "publication_record",
     "publications_before_barrier",
     "server_became_coordinator",
     "setup_succeeded",
