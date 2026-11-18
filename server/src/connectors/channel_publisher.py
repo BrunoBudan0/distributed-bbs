@@ -1,9 +1,9 @@
 import zmq
 
 from connectors.message_codec import encode_message
-from constants import COORDINATOR_TOPIC
-from dtos import CoordinatorAnnouncement, PublicationMessage
-from models import LogicalClock, Publication
+from constants import COORDINATOR_TOPIC, REPLICATION_TOPIC
+from dtos import CoordinatorAnnouncement, PublicationMessage, ReplicationMessage
+from models import LogicalClock, Publication, ReplicatedRecord
 from utils import print_sent_publication
 
 
@@ -23,6 +23,12 @@ class ChannelPublisher:
             coordinator_name, sent_at_ms, self.logical_clock.tick_for_send()
         )
         self.send_on_topic(COORDINATOR_TOPIC, announcement.as_fields())
+
+    def share_record(self, record: ReplicatedRecord, sender_name: str, sent_at_ms: int) -> None:
+        replication_message = ReplicationMessage.of_record(
+            record, sender_name, sent_at_ms, self.logical_clock.tick_for_send()
+        )
+        self.send_on_topic(REPLICATION_TOPIC, replication_message.as_fields())
 
     def send_on_topic(self, topic: str, message_fields: dict) -> None:
         print_sent_publication(topic, message_fields)

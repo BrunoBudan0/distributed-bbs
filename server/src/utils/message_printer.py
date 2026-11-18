@@ -10,6 +10,7 @@ SERVERS_LABEL = "SERVERS"
 CLOCK_LABEL = "CLOCK"
 BERKELEY_LABEL = "BERKELEY"
 ELECTION_LABEL = "ELECTION"
+REPLICA_LABEL = "REPLICA"
 TIMEOUT_LABEL = "TIMEOUT"
 IGNORED_LABEL = "IGNORED"
 LABEL_WIDTH = len(RECEIVED_LABEL)
@@ -38,8 +39,29 @@ def print_sent_publication(topic: str, publication_fields: dict) -> None:
     print_line(SENT_LABEL, f"topic={topic!r}{FIELD_SEPARATOR}{described_message(publication_fields)}")
 
 
-def print_ignored_announcement(reason: str) -> None:
-    print_line(IGNORED_LABEL, reason)
+def print_ignored_topic_message(topic: str) -> None:
+    print_line(IGNORED_LABEL, f"message on topic {topic!r} is outside the protocol")
+
+
+def print_ignored_replica_answer(coordinator_name: str, error_code: str) -> None:
+    print_line(IGNORED_LABEL, f"replication answer from {coordinator_name!r} is outside the protocol: {error_code}")
+
+
+def print_applied_record(record_label: str, record_kind: str) -> None:
+    print_line(REPLICA_LABEL, f"applied record {record_label} ({record_kind}) received on the replication topic")
+
+
+def print_replica_synchronization(coordinator_name: str, applied_record_count: int, pushed_record_count: int) -> None:
+    print_line(
+        REPLICA_LABEL,
+        FIELD_SEPARATOR.join(
+            [
+                f"synchronized with the coordinator {coordinator_name!r}",
+                f"applied_records={applied_record_count}",
+                f"pushed_records={pushed_record_count}",
+            ]
+        ),
+    )
 
 
 def print_rank(rank: int) -> None:

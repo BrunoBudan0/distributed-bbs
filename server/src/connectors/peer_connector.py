@@ -7,11 +7,13 @@ from constants import (
     PAYLOAD_FIELD,
     PEER_PORT,
     PEER_TIMEOUT_MS,
+    RECORDS_FIELD,
     SENDER_FIELD,
     TIMESTAMP_FIELD,
+    WATERMARKS_FIELD,
 )
 from errors import PeerUnavailable
-from models import LogicalClock, PeerOperation, PhysicalClock
+from models import LogicalClock, PeerOperation, PhysicalClock, ReplicatedRecord
 from schemas import process_response_from
 from utils import print_received_message, print_sent_message
 
@@ -28,18 +30,26 @@ class PeerConnector:
         self.peer_path_context = zmq.Context()
 
     def request_election(self, peer_name: str) -> dict:
-        return self.exchange(peer_name, PeerOperation.ELECTION)
+        return self.exchange(peer_name, PeerOperation.ELECTION, {})
 
     def request_clock(self, peer_name: str) -> dict:
-        return self.exchange(peer_name, PeerOperation.CLOCK)
+        return self.exchange(peer_name, PeerOperation.CLOCK, {})
 
-    def exchange(self, peer_name: str, operation: PeerOperation) -> dict:
+    def request_replication_sync(self, peer_name: str, watermarks: dict[str, int]) -> dict:
+        return self.exchange(peer_name, PeerOperation.REPLICATION_SYNC, {WATERMARKS_FIELD: watermarks})
+
+    def push_records(self, peer_name: str, records: list[ReplicatedRecord]) -> dict:
+        return self.exchange(
+            peer_name, PeerOperation.REPLICATION_PUSH, {RECORDS_FIELD: [record.as_fields() for record in records]}
+        )
+
+    def exchange(self, peer_name: str, operation: PeerOperation, payload: dict) -> dict:
         request_fields = {
             OPERATION_FIELD: operation.value,
             SENDER_FIELD: self.server_name,
             TIMESTAMP_FIELD: self.physical_clock.now_ms(),
             LOGICAL_CLOCK_FIELD: self.logical_clock.tick_for_send(),
-            PAYLOAD_FIELD: {},
+            PAYLOAD_FIELD: payload,
         }
         print_sent_message(request_fields)
         encoded_response = self.encoded_response_or_unavailable(peer_name, encode_message(request_fields))

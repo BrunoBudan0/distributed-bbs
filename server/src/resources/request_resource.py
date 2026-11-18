@@ -2,7 +2,7 @@ from connectors import BrokerConnector
 from constants import CHANNEL_FIELD, CHANNELS_FIELD, MESSAGE_FIELD
 from controllers import ChannelController, LoginController, PublicationController
 from dtos import RequestMessage
-from models import LogicalClock, Operation, PhysicalClock, Publication
+from models import Channel, LogicalClock, Login, Operation, PhysicalClock, Publication
 from resources.message_answerer import MessageAnswerer
 from schemas import KNOWN_OPERATION_NAMES, request_from
 
@@ -20,6 +20,7 @@ class RequestResource:
     ) -> None:
         self.server_name = server_name
         self.broker_connector = broker_connector
+        self.logical_clock = logical_clock
         self.physical_clock = physical_clock
         self.login_controller = login_controller
         self.channel_controller = channel_controller
@@ -42,12 +43,18 @@ class RequestResource:
         return self.operation_handlers[request.operation](request)
 
     def handle_login(self, request: RequestMessage) -> dict:
-        self.login_controller.record_login(request.sender, request.timestamp)
+        self.login_controller.record_login(Login(username=request.sender, logged_in_at_ms=request.timestamp))
         return {}
 
     def handle_create_channel(self, request: RequestMessage) -> dict:
         self.channel_controller.create_channel_or_refuse(
-            request.payload[CHANNEL_FIELD], request.sender, request.timestamp
+            Channel(
+                name=request.payload[CHANNEL_FIELD],
+                created_by_username=request.sender,
+                created_at_ms=request.timestamp,
+                created_logical_clock=self.logical_clock.counter,
+                created_on_server=self.server_name,
+            )
         )
         return {}
 

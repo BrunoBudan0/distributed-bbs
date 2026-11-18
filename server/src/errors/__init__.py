@@ -4,6 +4,7 @@ from errors.custom_errors import (
     ChannelNotFound,
     InvalidChannelName,
     InvalidMessage,
+    InvalidReplicatedRecord,
     InvalidServerName,
     InvalidUsername,
     MalformedMessage,
@@ -11,7 +12,7 @@ from errors.custom_errors import (
     UnknownOperation,
     UnknownPeerOperation,
 )
-from errors.reference_errors import PeerUnavailable, ReferenceTimeout, UnexpectedProcessResponse
+from errors.reference_errors import OutdatedDatabase, PeerUnavailable, ReferenceTimeout, UnexpectedProcessResponse
 
 __all__ = [
     "BbsError",
@@ -19,10 +20,12 @@ __all__ = [
     "ChannelNotFound",
     "InvalidChannelName",
     "InvalidMessage",
+    "InvalidReplicatedRecord",
     "InvalidServerName",
     "InvalidUsername",
     "MalformedMessage",
     "NotCoordinator",
+    "OutdatedDatabase",
     "PeerUnavailable",
     "ReferenceTimeout",
     "UnexpectedProcessResponse",

@@ -5,6 +5,7 @@ WORKDIR /app
 COPY requirements.txt requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements-test.txt
 
+COPY database ./database
 COPY src ./src
 COPY tests ./tests
 RUN PYTHONPATH=src python -m pytest -q tests && touch /unit-tests-passed

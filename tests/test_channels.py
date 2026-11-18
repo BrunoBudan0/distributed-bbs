@@ -5,6 +5,7 @@ import pytest
 from helpers import (
     CHANNEL_ALREADY_EXISTS,
     COORDINATOR_TOPIC,
+    REPLICATION_TOPIC,
     CREATE_CHANNEL,
     INVALID_CHANNEL_NAME,
     LIST_CHANNELS,
@@ -82,11 +83,12 @@ def test_channel_name_outside_the_allowed_format_is_refused_and_not_listed(bbs_c
     assert invalid_channel_name not in bbs_client.listed_channel_names()
 
 
-def test_channel_named_like_the_coordinator_topic_is_refused(bbs_client):
-    response = bbs_client.create_channel(COORDINATOR_TOPIC)
+@pytest.mark.parametrize("reserved_name", [COORDINATOR_TOPIC, REPLICATION_TOPIC])
+def test_channel_named_like_a_topic_reserved_for_servers_is_refused(bbs_client, reserved_name):
+    response = bbs_client.create_channel(reserved_name)
 
     assert_refused(response, INVALID_CHANNEL_NAME)
-    assert COORDINATOR_TOPIC not in bbs_client.listed_channel_names()
+    assert reserved_name not in bbs_client.listed_channel_names()
 
 
 def test_listing_contains_only_channel_names(bbs_client):
